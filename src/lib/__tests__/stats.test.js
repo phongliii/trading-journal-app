@@ -18,9 +18,9 @@ describe('computeStats', () => {
     expect(computeStats(null).total).toBe(0)
   })
 
-  // TradesView shows String(s.breakeven) — a filter with no matches renders
-  // "undefined" because emptyStats() is missing breakeven/breakevenRate.
-  it.fails('empty stats include breakeven fields (BUG: missing)', () => {
+  // TradesView shows String(s.breakeven) — must not be "undefined" when a
+  // filter matches nothing.
+  it('empty stats include breakeven fields', () => {
     const s = computeStats([])
     expect(s.breakeven).toBe(0)
     expect(s.breakevenRate).toBe(0)
@@ -215,9 +215,7 @@ describe('fmtCompact', () => {
     [null, '$0.00'],
   ])('fmtCompact(%s) = %s', (v, out) => expect(fmtCompact(v)).toBe(out))
 
-  // The trailing-zero trim regex also eats integer zeros when decimals=0.
-  // No caller passes decimals=0 today, so this is latent.
-  it.fails('decimals=0 keeps integer zeros (BUG: 150000 → "$15K")', () => {
+  it('decimals=0 keeps integer zeros', () => {
     expect(fmtCompact(150000, 0)).toBe('$150K')
   })
 })
@@ -259,12 +257,16 @@ describe('computeDrawdownFromEvents', () => {
     expect(r.realizedHighPnl).toBe(50) // realized P&L counts only in-window events
   })
 
-  // The comment says the peak starts at the equity ENTERING the window, but
-  // it is set after the first in-window event is applied — so a window that
-  // opens with a loss (500 → 400) never counts that first drop.
-  it.fails('continuous mode counts a loss on the first in-window event (BUG: reports 0)', () => {
+  // Peak starts at the equity ENTERING the window (500), not after the first
+  // in-window event, so a window that opens with a loss counts it.
+  it('continuous mode counts a loss on the first in-window event', () => {
     const events = [ev('2026-01-05T10:00:00', 500), ev('2026-01-06T10:00:00', -100)]
     expect(computeDrawdownFromEvents(events, '2026-01-06T00:00:00', null).maxDrawdown).toBe(100)
+  })
+
+  it('continuous mode with no window measures from a zero baseline', () => {
+    const events = [ev('2026-01-05T10:00:00', -40), ev('2026-01-05T11:00:00', 100)]
+    expect(computeDrawdownFromEvents(events)).toEqual({ maxDrawdown: 40, peakEquity: 60, realizedHighPnl: 60 })
   })
 
   it('daily-reset mode starts the peak at the first event and skips fund transactions', () => {

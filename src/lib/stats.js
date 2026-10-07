@@ -233,6 +233,10 @@ export function fmt(val, decimals = 2) {
   return (val < 0 ? '-$' : '$') + s
 }
 
+// Drops trailing zeros after the decimal point ("42.50" -> "42.5",
+// "42.00" -> "42") but never from the integer part ("150" stays "150").
+const trimZeros = s => (s.includes('.') ? s.replace(/\.?0+$/, '') : s)
+
 // Abbreviated currency format: 15000 -> $15K, 2500000 -> $2.5M, etc.
 // Falls back to normal fmt() for values under 10,000 to preserve precision
 // for everyday trade/account figures.
@@ -259,13 +263,13 @@ export function fmtCompact(val, decimals = 2) {
         if (i > 0) {
           // Bump to the next larger unit (e.g. 999.995K -> 1M)
           num = abs / units[i - 1].value
-          const trimmed = num.toFixed(decimals).replace(/\.?0+$/, '')
+          const trimmed = trimZeros(num.toFixed(decimals))
           return `${sign}$${trimmed}${units[i - 1].suffix}`
         }
         // No unit above T — clamp so it never shows "1000T"
         num = 1000 - (1 / Math.pow(10, decimals))
       }
-      const trimmed = num.toFixed(decimals).replace(/\.?0+$/, '')
+      const trimmed = trimZeros(num.toFixed(decimals))
       return `${sign}$${trimmed}${suffix}`
     }
   }
@@ -276,7 +280,7 @@ export function fmtPct(val) {
   const num = val || 0
   const fixed = num.toFixed(2)
   // Trim trailing zeros: "42.00" -> "42", "42.50" -> "42.5", "42.54" -> "42.54"
-  const trimmed = fixed.replace(/\.?0+$/, '')
+  const trimmed = trimZeros(fixed)
   return trimmed + '%'
 }
 
@@ -284,7 +288,7 @@ function emptyStats() {
   return {
     totalPnl: 0, grossWin: 0, grossLoss: 0, winRate: 0,
     avgWin: 0, avgLoss: 0, profitFactor: 0, expectancy: 0,
-    largestGain: 0, largestLoss: 0, wins: 0, losses: 0, total: 0,
+    largestGain: 0, largestLoss: 0, wins: 0, losses: 0, breakeven: 0, breakevenRate: 0, total: 0,
     maxConsecWins: 0, maxConsecLosses: 0, maxDrawdown: 0, equityCurve: [], dailyBars: [],
   }
 }
@@ -348,13 +352,18 @@ export function computeDrawdownFromEvents(events, from = null, to = null, dailyR
     let peak = null
 
     for (const e of sorted) {
+      if (to && e.timestamp > to) break
+      // Peak starts at the equity ENTERING the window — taken before the
+      // first in-window event is applied, so a window that opens with a
+      // loss counts that drop as drawdown.
+      if (peak === null && !(from && e.timestamp < from)) peak = balance - totalFunding
+
       // Accumulate balance/funding for ALL events (even before window) to get
       // the correct entering-equity value when the window starts partway through history
       balance += e.delta
       if (e.type === 'Fund Transaction') totalFunding += e.delta
 
       if (from && e.timestamp < from) continue
-      if (to && e.timestamp > to) break
 
       if (e.type !== 'Fund Transaction') {
         realizedCumulative += e.delta
@@ -362,7 +371,6 @@ export function computeDrawdownFromEvents(events, from = null, to = null, dailyR
       }
 
       const adjustedEquity = balance - totalFunding
-      if (peak === null) peak = adjustedEquity // peak initialized to equity ENTERING the window
       if (adjustedEquity > peak) peak = adjustedEquity
       const dd = peak - adjustedEquity
       if (dd > maxDD) maxDD = dd
