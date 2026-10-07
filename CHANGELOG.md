@@ -30,6 +30,8 @@
   browser-only "Storage used" tile; Clear Data is now **Reset**: deletes the
   active account's trades, journal, balance, cash events, backed-up CSVs and
   cloud preferences, then clears this browser's local data except your login.
+- Settings → Supabase Table Schema: the note no longer says the app doesn't use
+  these tables yet.
 
 ### Fixed
 - Date picker: edge days no longer flash the bright colour when paging months.

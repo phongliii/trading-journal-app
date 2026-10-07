@@ -423,7 +423,7 @@
              doesn't talk to these tables yet (lib/supabaseAdapter.js is the
              next piece of Phase 2), so running this now just has the
              tables sitting there ready, ahead of the app using them. -->
-        <p class="text-xs text-ink-muted mt-0.5">Run this now if you want — the app doesn't use these tables yet, but the schema's ready.</p>
+        <p class="text-xs text-ink-muted mt-0.5">The app saves everything to these tables. Run this once in the Supabase SQL editor to set them up — if you've already run it, you don't need to again.</p>
       </div>
       <div class="p-5">
         <div class="relative">
