@@ -1,0 +1,90 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #1e2d42; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #2a3f5a; }
+
+  ::selection { background: #00c89640; }
+}
+
+@layer components {
+  /* Stat number — large mono figures */
+  .stat-num {
+    @apply font-mono text-2xl font-medium tabular-nums tracking-tight;
+  }
+
+  /* Subtle card glow on hover */
+  .card-hover {
+    @apply transition-all duration-200 hover:border-border-strong hover:shadow-lg;
+  }
+
+  /* Green/Red pill badge */
+  .badge-up   { @apply inline-flex items-center gap-1 text-2xs font-semibold px-2 py-0.5 rounded-full bg-up/10 text-up; }
+  .badge-down { @apply inline-flex items-center gap-1 text-2xs font-semibold px-2 py-0.5 rounded-full bg-down/10 text-down; }
+  .badge-neutral { @apply inline-flex items-center gap-1 text-2xs font-semibold px-2 py-0.5 rounded-full bg-surface-4 text-ink-muted; }
+  /* Neutral tag pill — used for trade tags so it doesn't visually compete
+     with the Win/Loss and up/down badges elsewhere. Hover matches the app's
+     standard button-hover treatment (see .btn-ghost). */
+  .badge-tag {
+    @apply inline-flex items-center gap-1 text-2xs font-semibold px-2 py-0.5 rounded-full
+           bg-surface-4 text-ink border border-border-strong
+           hover:bg-surface-3 hover:border-border-strong hover:text-ink transition-colors;
+  }
+
+  /* Thin horizontal rule */
+  .rule { @apply border-t border-border; }
+
+  /* Table */
+  .data-table { @apply w-full text-sm; }
+  .data-table th {
+    @apply text-left text-2xs font-medium text-ink-muted uppercase tracking-widest py-2.5 px-3 border-b border-border sticky top-0 bg-surface-2 z-10;
+  }
+  .data-table td { @apply py-3 px-3 border-b border-border/50 align-middle; }
+  .data-table tbody tr { @apply transition-colors hover:bg-surface-3/40; }
+  .data-table tbody tr:last-child td { @apply border-b-0; }
+
+  /* Button base */
+  .btn { @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 disabled:opacity-40 disabled:cursor-not-allowed; }
+  .btn-primary { @apply btn bg-brand text-surface-0 hover:bg-brand-dim active:scale-[0.98]; }
+  .btn-ghost   { @apply btn bg-transparent border border-border text-ink-muted hover:border-border-strong hover:text-ink hover:bg-surface-3; }
+  .btn-danger  { @apply btn bg-transparent border border-down/30 text-down hover:bg-down/10; }
+  .btn-sm      { @apply px-3 py-1.5 text-xs rounded-md; }
+
+  /* Form input */
+  .input {
+    @apply w-full bg-surface-1 border border-border rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-faint
+           focus:outline-none focus:border-brand/60 focus:ring-1 focus:ring-brand/20 transition-colors;
+  }
+  .input-label { @apply block text-xs font-medium text-ink-muted mb-1.5; }
+
+  /* Sidebar nav item */
+  .nav-link {
+    @apply flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-ink-muted
+           transition-colors hover:text-ink hover:bg-surface-3 w-full text-left;
+  }
+  .nav-link.active { @apply text-ink bg-surface-3 border border-border; }
+
+  /* Progress bar track */
+  .bar-track { @apply h-1 rounded-full bg-surface-4 overflow-hidden; }
+  .bar-fill-up   { @apply h-full rounded-full bg-up transition-all duration-500; }
+  .bar-fill-down { @apply h-full rounded-full bg-down transition-all duration-500; }
+}
+
+/* Page transition */
+.page-enter-active,
+.page-leave-active { transition: opacity 0.15s ease, transform 0.15s ease; }
+.page-enter-from   { opacity: 0; transform: translateY(6px); }
+.page-leave-to     { opacity: 0; transform: translateY(-6px); }
+
+/* Toast slide-up */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.toast-anim { animation: toast-in 0.2s ease forwards; }
