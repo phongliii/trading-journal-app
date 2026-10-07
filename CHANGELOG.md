@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- Trades: the Breakeven tile showed "undefined" when a filter matched no trades.
+- Max Drawdown (Dashboard, Journal week/month): a period that opened with a
+  loss didn't count that first drop — the peak now starts at the equity going
+  into the period.
+- Compact money format with 0 decimals no longer drops integer zeros
+  ($150K showed as $15K).
+
+### Added
+- Unit tests (`npm test`, Vitest) for stats, the Realized P&L buckets and the
+  CSV parsers.
+
 ## 2.1.0 — 2026-10-06
 
 ### Added
