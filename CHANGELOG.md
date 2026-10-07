@@ -34,7 +34,7 @@
   these tables yet.
 
 ### Fixed
-- Date picker: edge days no longer flash the bright colour when paging months.
+- Date picker: edge days no longer flash the bright color when paging months.
 
 ## 2.0.2 — 2026-10-06
 
