@@ -179,7 +179,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="t in pagedTrades" :key="t.id" @click="selectedTrade = t" class="cursor-pointer">
+                  <tr v-for="t in pagedTrades" :key="t.id" @click="openTrade(t)" class="cursor-pointer">
                     <td class="font-mono font-semibold text-ink">{{ t.symbol }}</td>
                     <td>
                       <span class="badge-neutral" v-if="!t.side || t.side === 'long'">Long</span>
@@ -534,6 +534,14 @@ const yearModalPage = ref(0)
 const page           = ref(0)
 const tradePage      = ref(0)
 const selectedTrade  = ref(null)
+// The table's rows come from `selected.value.trades`, a snapshot the
+// trades watch above deliberately leaves alone for notes/tags/strategy/
+// chartImage-only edits. Passing that snapshot straight to TradeDrawer
+// reopened a trade with its old values — e.g. a chart image just added
+// didn't show until a page refresh. Open the store's current copy instead.
+function openTrade(t) {
+  selectedTrade.value = tradesStore.trades.find(x => x.id === t.id) || t
+}
 
 const tabs = computed(() => [
   { id: 'daily',   label: 'Daily',   unread: journalStore.unreadDaily },
