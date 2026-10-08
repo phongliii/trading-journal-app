@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### Fixed
+- Journal: reopening a trade from the day's trade table showed its old chart
+  image, notes, tags and strategy until a page refresh.
 - Trades: the Breakeven tile showed "undefined" when a filter matched no trades.
 - Max Drawdown (Dashboard, Journal week/month): a period that opened with a
   loss didn't count that first drop — the peak now starts at the equity going
