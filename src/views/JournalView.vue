@@ -131,29 +131,32 @@
               </div>
             </div>
           </div>
+        </template>
 
-          <!-- Attached chart image -->
-          <div v-if="entryImage" class="bg-surface-2 border border-border rounded-xl overflow-hidden mb-4 relative group cursor-pointer" @click="lightboxOpen = true">
-            <img v-if="entryImageUrl" :src="entryImageUrl" alt="Chart" class="w-full h-64 object-cover" />
-            <div v-else class="w-full h-64 flex flex-col items-center justify-center gap-2 bg-down/5">
-              <svg class="w-6 h-6 text-down" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                <rect x="3" y="3" width="18" height="18" rx="2"/>
-                <path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 3.5" stroke-linecap="round"/>
-                <circle cx="12" cy="16.5" r="0.5" fill="currentColor" stroke="none"/>
-              </svg>
-              <span class="text-2xs text-down">File not found</span>
-              <button @click.stop="clearBrokenImage" class="text-2xs text-down bg-down/10 rounded-full px-3 py-1 hover:bg-down/20 transition-colors">Clear</button>
-            </div>
-            <div v-if="entryImageUrl" class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-              <button @click.stop="removeChartImage" class="flex items-center gap-1.5 bg-surface-2 border border-border rounded-lg px-3 py-1.5 text-xs text-ink hover:bg-surface-3 transition-colors">
-                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
-                </svg>
-                Remove
-              </button>
-            </div>
+        <!-- Attached chart image — outside the trades-only blocks so a
+             no-trade day can still have one -->
+        <div v-if="entryImage" class="bg-surface-2 border border-border rounded-xl overflow-hidden mb-4 relative group cursor-pointer" @click="lightboxOpen = true">
+          <img v-if="entryImageUrl" :src="entryImageUrl" alt="Chart" class="w-full h-64 object-cover" />
+          <div v-else class="w-full h-64 flex flex-col items-center justify-center gap-2 bg-down/5">
+            <svg class="w-6 h-6 text-down" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 3.5" stroke-linecap="round"/>
+              <circle cx="12" cy="16.5" r="0.5" fill="currentColor" stroke="none"/>
+            </svg>
+            <span class="text-2xs text-down">File not found</span>
+            <button @click.stop="clearBrokenImage" class="text-2xs text-down bg-down/10 rounded-full px-3 py-1 hover:bg-down/20 transition-colors">Clear</button>
           </div>
+          <div v-if="entryImageUrl" class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+            <button @click.stop="removeChartImage" class="flex items-center gap-1.5 bg-surface-2 border border-border rounded-lg px-3 py-1.5 text-xs text-ink hover:bg-surface-3 transition-colors">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+              </svg>
+              Remove
+            </button>
+          </div>
+        </div>
 
+        <template v-if="selected.trades.length > 0">
           <div class="bg-surface-2 border border-border rounded-xl p-4 mb-4">
             <div class="text-xs font-medium text-ink mb-3">Session P&L</div>
             <!-- selected.type is 'daily' | 'weekly' | 'monthly' — this used
