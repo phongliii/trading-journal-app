@@ -3,7 +3,7 @@
        with the cell's note actions. @click.stop so clicks here don't
        re-trigger the cell's own click handler. -->
   <div class="absolute inset-0 z-10 bg-surface-2 flex flex-col items-center justify-center gap-1.5 p-2" @click.stop>
-    <button class="w-full max-w-[120px] bg-surface-2 border border-border rounded-lg px-3 py-1.5 text-xs text-ink hover:bg-surface-3 transition-colors"
+    <button class="btn btn-primary btn-sm w-full max-w-[120px]"
       @click="$emit('confirm')">
       {{ hasEntry ? 'Open note' : 'Create note' }}
     </button>
