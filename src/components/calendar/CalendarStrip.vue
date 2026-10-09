@@ -22,7 +22,7 @@
           !day.isFuture && day.trades > 0 && day.pnl < 0  ? 'bg-down/5' : '',
           day.isFuture ? 'opacity-35' : 'hover:bg-surface-3/40 cursor-pointer',
         ]"
-        @click="!day.isFuture && onDayClick(day.date, $event, day)">
+        @click="!day.isFuture && onDayClick(day.date, $event)">
 
         <div class="flex items-center justify-between mb-2">
           <div class="flex items-center gap-1">
@@ -55,6 +55,9 @@
 
         <div v-if="day.trades > 0" class="absolute bottom-0 left-0 right-0 h-0.5"
           :class="day.pnl >= 0 ? 'bg-up' : 'bg-down'" />
+
+        <DayNoteOverlay v-if="isNoteOpen(day.date)" :has-entry="noteTarget.hasEntry"
+          @confirm="confirmNote" @close="closeNote" />
       </div>
 
       <!-- Weekly total — same style as day cell -->
@@ -83,7 +86,6 @@
     </div>
 
 
-    <AddNotePopover :target="noteTarget" @confirm="confirmNote" @cancel="closeNote" />
   </div>
 </template>
 
@@ -96,15 +98,15 @@ import { useTimezoneStore } from '@/stores/timezone'
 import CompactValue from '@/components/ui/CompactValue.vue'
 import { startOfWeek, endOfWeek, eachDayOfInterval, format, addWeeks, startOfMonth } from 'date-fns'
 import HolidayIcon from '@/components/calendar/HolidayIcon.vue'
-import AddNotePopover from '@/components/calendar/AddNotePopover.vue'
+import DayNoteOverlay from '@/components/calendar/DayNoteOverlay.vue'
 import { useCalendarNotes } from '@/composables/useCalendarNotes'
 import { useRouter } from 'vue-router'
 
 const props = defineProps({ trades: { type: Array, required: true } })
 
 const journalStore = useJournalStore()
-// Day clicks: popover with Close + Open note / Create note.
-const { noteTarget, onDayClick, confirmNote, closeNote } = useCalendarNotes()
+// Day clicks: overlay with Open note / Create note + Close.
+const { noteTarget, isNoteOpen, onDayClick, confirmNote, closeNote } = useCalendarNotes()
 const tzStore = useTimezoneStore()
 const router = useRouter()
 
