@@ -10,8 +10,8 @@
         </button>
       </TooltipWrap>
     </div>
-    <div v-if="noTradeDay" class="inline-flex items-center bg-surface-3 text-ink-muted text-2xs font-medium rounded-full px-2.5 py-0.5 mb-2">No-trade day</div>
-    <div class="text-xs text-ink-muted leading-loose pr-6">
+    <div v-if="noTradeDay" class="inline-flex items-center bg-surface-3 text-ink-muted text-2xs font-medium rounded-full px-2.5 py-0.5">No-trade day</div>
+    <div v-if="!noTradeDay" class="text-xs text-ink-muted leading-loose pr-6">
       <div v-for="(q, i) in questions" :key="q.id">
         {{ i + 1 }}. {{ q.text }}
         <span v-if="answers[q.id] === 'yes'" class="font-semibold" :class="q.yesIsGood ? 'text-up' : 'text-down'">Yes.</span>
