@@ -43,7 +43,7 @@
             cell.inMonth && !cell.isFuture && cell.trades > 0 && cell.pnl < 0 ? 'bg-down/5' : '',
             !cell.isFuture ? 'hover:bg-surface-3/40 cursor-pointer' : '',
           ]"
-          @click="!cell.isFuture && onDayClick(cell.date, $event, cell)">
+          @click="!cell.isFuture && onDayClick(cell.date, $event)">
 
           <!-- Date row -->
           <div class="flex items-center justify-between mb-2">
@@ -83,6 +83,9 @@
           <div v-if="cell.trades > 0 && cell.inMonth"
             class="absolute bottom-0 left-0 right-0 h-0.5"
             :class="cell.pnl >= 0 ? 'bg-up' : 'bg-down'" />
+
+          <DayNoteOverlay v-if="isNoteOpen(cell.date)" :has-entry="noteTarget.hasEntry"
+            @confirm="confirmNote" @close="closeNote" />
         </div>
 
         <!-- Week total — same style as day cell -->
@@ -205,7 +208,6 @@
     </div>
 
 
-    <AddNotePopover :target="noteTarget" @confirm="confirmNote" @cancel="closeNote" />
   </div>
 </template>
 
@@ -217,7 +219,7 @@ import { useTimezoneStore } from '@/stores/timezone'
 import { fmt, fmtPct, computeStats, aggregateTrades } from '@/lib/stats'
 import { weekKey } from '@/lib/journalKeys'
 import HolidayIcon from '@/components/calendar/HolidayIcon.vue'
-import AddNotePopover from '@/components/calendar/AddNotePopover.vue'
+import DayNoteOverlay from '@/components/calendar/DayNoteOverlay.vue'
 import { useCalendarNotes } from '@/composables/useCalendarNotes'
 import CompactValue from '@/components/ui/CompactValue.vue'
 import StatsPill from '@/components/ui/StatsPill.vue'
@@ -234,8 +236,8 @@ const MONTHS = ['January','February','March','April','May','June','July','August
 const router = useRouter()
 const tradesStore  = useTradesStore()
 const journalStore = useJournalStore()
-// Day clicks: popover with Close + Open note / Create note.
-const { noteTarget, onDayClick, confirmNote, closeNote } = useCalendarNotes()
+// Day clicks: overlay with Open note / Create note + Close.
+const { noteTarget, isNoteOpen, onDayClick, confirmNote, closeNote } = useCalendarNotes()
 const tzStore      = useTimezoneStore()
 
 // Week-total cell: "does a weekly entry exist" and "navigate to it". (Day
