@@ -818,6 +818,18 @@ function createNote(key) {
 // The period already has a note — just jump to it.
 function openNote(key) { focusEntryKey(activeTab.value, key) }
 
+// Weekly: set the year + quarter filters to the quarter the week falls in
+// (from the entry's own weekStart — the same field the sidebar filters
+// on), rather than clearing the quarter to "Show all". Falls back to
+// clearing it if the entry isn't in the list yet.
+function pointFiltersAtWeek(key) {
+  const entry = journalStore.weeklyEntries.find(e => e.key === key)
+  if (!entry?.weekStart) { selectedQuarter.value = null; return }
+  const ws = new Date(entry.weekStart)
+  selectedYear.value = getYear(ws)
+  selectedQuarter.value = Math.floor(getMonth(ws) / 3) + 1
+}
+
 // Select an entry by key. Stale year/month/quarter/page filters left over
 // from earlier browsing could hide it from the sidebar, so they're pointed
 // at its period first; the lookup retries a few ticks because a brand-new
@@ -826,7 +838,7 @@ function focusEntryKey(tab, key) {
   suppressAutoSelect = true
   selectedYear.value = Number(key.slice(0, 4))
   if (tab === 'daily') selectedMonth.value = Number(key.slice(5, 7))
-  if (tab === 'weekly') selectedQuarter.value = null
+  if (tab === 'weekly') pointFiltersAtWeek(key)
   page.value = 0
 
   function trySelect(attempt) {
@@ -989,12 +1001,10 @@ function openEntryInJournal(tab, key) {
   activeTab.value = tab
   selectedYear.value = Number(key.slice(0, 4))
   if (tab === 'daily') selectedMonth.value = Number(key.slice(5, 7))
-  // A `yyyy-Www` week key doesn't cleanly map to a quarter without extra
-  // date math, so rather than compute it, just clear any active quarter
-  // filter — same reasoning as the selectedYear/page reset below: a stale
-  // filter from earlier browsing shouldn't be able to hide the entry a
-  // Calendar-page link is specifically trying to jump to.
-  if (tab === 'weekly') selectedQuarter.value = null
+  // Point the quarter filter at the week's own quarter, so a stale filter
+  // from earlier browsing can't hide the entry a Calendar-page link is
+  // trying to jump to.
+  if (tab === 'weekly') pointFiltersAtWeek(key)
 
   function trySelect(attempt) {
     const idx = currentEntries.value.findIndex(e => e.key === key)
