@@ -44,6 +44,10 @@
             {{ fmtPct((day.wins / day.trades) * 100) }} wr
           </div>
         </div>
+        <!-- Marked "No-trade day" in the Journal check-in -->
+        <template v-else-if="!day.isFuture && isNoTradeDay(day.date)">
+          <div class="text-sm text-ink-muted">No trade</div>
+        </template>
         <div v-else-if="!day.isFuture" class="space-y-1">
           <div class="font-mono text-sm font-bold leading-none text-ink-faint/40">$0.00</div>
           <div class="text-2xs text-ink-faint/40">0 trades</div>
@@ -111,6 +115,7 @@ function goToJournal(key, list, queryParam) {
 }
 
 const hasDailyEntry  = (date) => hasJournalEntry(format(date, 'yyyy-MM-dd'), journalStore.dailyEntries)
+const isNoTradeDay   = (date) => journalStore.getNoTradeDay(format(date, 'yyyy-MM-dd'))
 const hasWeeklyEntry = (mondayDate) => hasJournalEntry(weekKey(mondayDate), journalStore.weeklyEntries)
 const goToJournalDate = (date) => goToJournal(format(date, 'yyyy-MM-dd'), journalStore.dailyEntries, 'date')
 const goToJournalWeek = (mondayDate) => goToJournal(weekKey(mondayDate), journalStore.weeklyEntries, 'week')

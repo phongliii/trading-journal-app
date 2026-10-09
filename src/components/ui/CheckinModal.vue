@@ -20,7 +20,10 @@
           </span>
         </button>
 
-        <div v-for="q in questions" :key="q.id" class="mb-4">
+        <!-- Questions are about trading, so they're hidden on a no-trade day.
+             Any answers already given are kept (not cleared) in case the
+             toggle is switched back off. -->
+        <div v-for="q in (noTradeDay ? [] : questions)" :key="q.id" class="mb-4">
           <div class="text-xs text-ink mb-1.5">{{ q.text }}</div>
           <div class="flex bg-surface-3 rounded-lg p-0.5">
             <button
