@@ -7,10 +7,12 @@
   "No-trade day" badge on the check-in card instead of the questions, and no
   longer re-prompt for them. The questions are hidden in the check-in while
   the toggle is on.
-- Calendar and the Dashboard's weekly calendar show a no-trade day as a
+- Calendar and the Dashboard's weekly calendar show a no-trade day as
   "No trade" instead of "$0.00 / 0 trades".
 
 ### Fixed
+- Journal: creating (or jumping to) a weekly note reset the quarter filter to
+  "Show all" — it now switches to that week's quarter.
 - Journal: a chart image added to a day with no trades didn't show (it was
   only rendered alongside the trade stats).
 - Journal: reopening a trade from the day's trade table showed its old chart
