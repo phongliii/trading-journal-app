@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### Fixed
+- Journal: a chart image added to a day with no trades didn't show (it was
+  only rendered alongside the trade stats).
 - Journal: reopening a trade from the day's trade table showed its old chart
   image, notes, tags and strategy until a page refresh.
 - Trades: the Breakeven tile showed "undefined" when a filter matched no trades.
