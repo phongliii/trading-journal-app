@@ -3,46 +3,51 @@ import { useRouter } from 'vue-router'
 import { format } from 'date-fns'
 import { useJournalStore } from '@/stores/journal'
 
-// Day-cell behavior shared by CalendarView (month grid) and CalendarStrip
-// (weekly strip): which days have a written note (the dot), and what a click
-// on a day does — open its entry if one exists, otherwise offer to add one
-// (AddNotePopover). Weekly entries keep their own helpers in the views.
+// Day-cell click behavior shared by CalendarView (month grid) and
+// CalendarStrip (weekly strip): clicking any past/today day opens a small
+// popover (AddNotePopover) with Close plus "Open note" when the day already
+// has a Journal entry (trades or a written note), or "Create note" when it
+// doesn't. Weekly entries keep their own helpers in the views.
 export function useCalendarNotes() {
   const router = useRouter()
   const journalStore = useJournalStore()
 
-  // { date, rect } of the empty day the popover is anchored to, or null.
-  const addTarget = ref(null)
+  // { date, rect, hasEntry, hasNote, trades, pnl } of the day the popover is
+  // anchored to, or null.
+  const noteTarget = ref(null)
 
   const dayKey = (date) => format(date, 'yyyy-MM-dd')
   const hasDailyEntry = (date) => journalStore.dailyEntries.some(e => e.key === dayKey(date))
-  const hasNote = (date) => journalStore.hasNote(dayKey(date))
 
   function openEntry(key) {
     router.push({ path: '/journal', query: { date: key } })
   }
 
-  function onDayClick(date, event) {
-    if (hasDailyEntry(date)) {
-      openEntry(dayKey(date))
-      return
-    }
+  // `stats` is the cell's own { trades, pnl }, shown in the popover.
+  function onDayClick(date, event, stats = {}) {
     const r = event.currentTarget.getBoundingClientRect()
-    addTarget.value = { date, rect: { top: r.top, bottom: r.bottom, left: r.left, width: r.width } }
+    noteTarget.value = {
+      date,
+      rect: { top: r.top, bottom: r.bottom, left: r.left, width: r.width },
+      hasEntry: hasDailyEntry(date),
+      hasNote: journalStore.hasNote(dayKey(date)),
+      trades: stats.trades || 0,
+      pnl: stats.pnl || 0,
+    }
   }
 
-  function confirmAdd() {
-    const target = addTarget.value
+  function confirmNote() {
+    const target = noteTarget.value
     if (!target) return
-    addTarget.value = null
+    noteTarget.value = null
     const key = dayKey(target.date)
-    journalStore.setSections(key, journalStore.defaultSections())
+    if (!target.hasEntry) journalStore.setSections(key, journalStore.defaultSections())
     openEntry(key)
   }
 
-  function cancelAdd() {
-    addTarget.value = null
+  function closeNote() {
+    noteTarget.value = null
   }
 
-  return { addTarget, hasDailyEntry, hasNote, onDayClick, confirmAdd, cancelAdd }
+  return { noteTarget, hasDailyEntry, onDayClick, confirmNote, closeNote }
 }

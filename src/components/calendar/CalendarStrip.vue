@@ -20,9 +20,9 @@
           di === 0 ? 'rounded-bl-2xl' : '',
           !day.isFuture && day.trades > 0 && day.pnl > 0  ? 'bg-up/5'   : '',
           !day.isFuture && day.trades > 0 && day.pnl < 0  ? 'bg-down/5' : '',
-          day.isFuture ? 'opacity-35' : (hasDailyEntry(day.date) ? 'hover:bg-surface-3/40 cursor-pointer' : ''),
+          day.isFuture ? 'opacity-35' : 'hover:bg-surface-3/40 cursor-pointer',
         ]"
-        @click="!day.isFuture && goToJournalDate(day.date)">
+        @click="!day.isFuture && onDayClick(day.date, $event, day)">
 
         <div class="flex items-center justify-between mb-2">
           <div class="flex items-center gap-1">
@@ -82,6 +82,8 @@
       </div>
     </div>
 
+
+    <AddNotePopover :target="noteTarget" @confirm="confirmNote" @cancel="closeNote" />
   </div>
 </template>
 
@@ -94,17 +96,20 @@ import { useTimezoneStore } from '@/stores/timezone'
 import CompactValue from '@/components/ui/CompactValue.vue'
 import { startOfWeek, endOfWeek, eachDayOfInterval, format, addWeeks, startOfMonth } from 'date-fns'
 import HolidayIcon from '@/components/calendar/HolidayIcon.vue'
+import AddNotePopover from '@/components/calendar/AddNotePopover.vue'
+import { useCalendarNotes } from '@/composables/useCalendarNotes'
 import { useRouter } from 'vue-router'
 
 const props = defineProps({ trades: { type: Array, required: true } })
 
 const journalStore = useJournalStore()
+// Day clicks: popover with Close + Open note / Create note.
+const { noteTarget, onDayClick, confirmNote, closeNote } = useCalendarNotes()
 const tzStore = useTimezoneStore()
 const router = useRouter()
 
-// Day and week journal entries are keyed differently ('yyyy-MM-dd' vs
-// 'yyyy-Wnn'), but "does an entry exist for this key" and "navigate to it"
-// are otherwise identical — shared here instead of duplicated per-kind.
+// Week-total cell: "does a weekly entry exist" and "navigate to it". (Day
+// cells use useCalendarNotes' popover instead.)
 // Same helpers as CalendarView.vue; weekKey() itself lives in lib/journalKeys.js.
 function hasJournalEntry(key, list) {
   return list.some(e => e.key === key)
@@ -114,10 +119,8 @@ function goToJournal(key, list, queryParam) {
   router.push({ path: '/journal', query: { [queryParam]: key } })
 }
 
-const hasDailyEntry  = (date) => hasJournalEntry(format(date, 'yyyy-MM-dd'), journalStore.dailyEntries)
 const isNoTradeDay   = (date) => journalStore.getNoTradeDay(format(date, 'yyyy-MM-dd'))
 const hasWeeklyEntry = (mondayDate) => hasJournalEntry(weekKey(mondayDate), journalStore.weeklyEntries)
-const goToJournalDate = (date) => goToJournal(format(date, 'yyyy-MM-dd'), journalStore.dailyEntries, 'date')
 const goToJournalWeek = (mondayDate) => goToJournal(weekKey(mondayDate), journalStore.weeklyEntries, 'week')
 
 const offset = ref(0)
