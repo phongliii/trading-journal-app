@@ -6,6 +6,20 @@
         <div class="text-base font-semibold text-ink mb-0.5">Daily check-in</div>
         <div class="text-xs text-ink-faint mb-5">{{ dateLabel }}</div>
 
+        <button type="button" role="switch" :aria-checked="noTradeDay"
+          class="w-full flex items-center justify-between bg-surface-3 rounded-lg px-3 py-2.5 mb-5 text-left"
+          @click="noTradeDay = !noTradeDay">
+          <span>
+            <span class="block text-xs text-ink">No-trade day</span>
+            <span class="block text-2xs text-ink-faint">I didn't trade today</span>
+          </span>
+          <span class="relative inline-flex w-9 h-5 rounded-full transition-colors flex-shrink-0"
+            :class="noTradeDay ? 'bg-brand' : 'bg-surface-4'">
+            <span class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform"
+              :class="noTradeDay ? 'translate-x-4' : ''"></span>
+          </span>
+        </button>
+
         <div v-for="q in questions" :key="q.id" class="mb-4">
           <div class="text-xs text-ink mb-1.5">{{ q.text }}</div>
           <div class="flex bg-surface-3 rounded-lg p-0.5">
@@ -36,12 +50,14 @@ const props = defineProps({
   questions: { type: Array, required: true },
   dateLabel: { type: String, required: true },
   initialAnswers: { type: Object, default: () => ({}) },
+  initialNoTradeDay: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['save', 'skip'])
 
 const visible = ref(true)
 const answers = ref({ ...props.initialAnswers })
+const noTradeDay = ref(props.initialNoTradeDay)
 
 function options(q) {
   return [
@@ -54,7 +70,7 @@ function options(q) {
 
 function save() {
   visible.value = false
-  emit('save', { ...answers.value })
+  emit('save', { ...answers.value }, noTradeDay.value)
 }
 
 function skip() {

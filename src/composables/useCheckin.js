@@ -15,9 +15,14 @@ export function useCheckin(selected) {
     return journalStore.getChecklistAnswers(selected.value.key)
   })
 
-  function saveCheckin(answers) {
+  const noTradeDay = computed(() => {
+    if (!selected.value || selected.value.type !== 'daily') return false
+    return journalStore.getNoTradeDay(selected.value.key)
+  })
+
+  function saveCheckin(answers, isNoTradeDay) {
     if (!selected.value) return
-    journalStore.setChecklistAnswers(selected.value.key, answers)
+    journalStore.setCheckin(selected.value.key, answers, isNoTradeDay)
     showCheckinModal.value = false
   }
 
@@ -25,5 +30,5 @@ export function useCheckin(selected) {
     showCheckinModal.value = false
   }
 
-  return { showCheckinModal, checkinAnswers, saveCheckin, skipCheckin }
+  return { showCheckinModal, checkinAnswers, noTradeDay, saveCheckin, skipCheckin }
 }

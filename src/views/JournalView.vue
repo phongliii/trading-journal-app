@@ -110,6 +110,7 @@
         <CheckinCard v-if="selected.type === 'daily'"
           :questions="journalStore.checklistQuestions"
           :answers="checkinAnswers"
+          :no-trade-day="noTradeDay"
           @edit="showCheckinModal = true" />
 
         <!-- Stats + chart + table (only when trades exist) -->
@@ -371,6 +372,7 @@
       :questions="journalStore.checklistQuestions"
       :date-label="selected.label || formatDate(selected.date)"
       :initial-answers="checkinAnswers"
+      :initial-no-trade-day="noTradeDay"
       @save="saveCheckin"
       @skip="skipCheckin" />
 
@@ -441,7 +443,7 @@ const selected       = ref(null)
 // Checkin modal and chart-image attachment are both self-contained concerns
 // that only react to `selected` — split out to composables so this file
 // stays focused on entry list/CRUD, pagination, and sections.
-const { showCheckinModal, checkinAnswers, saveCheckin, skipCheckin } = useCheckin(selected)
+const { showCheckinModal, checkinAnswers, noTradeDay, saveCheckin, skipCheckin } = useCheckin(selected)
 const {
   chartFileInput, lightboxOpen, entryImageUrl, hasImageFolder, entryImage,
   onChartFileSelected, removeChartImage, clearBrokenImage,
@@ -729,6 +731,9 @@ function cloneEntry(entry) {
 // CURRENT question set, not just "any answers exist at all" — if a
 // question was added after this day was answered, it's still missing.
 function checklistFullyAnswered(key) {
+  // A day marked as a no-trade day counts as checked in — its questions
+  // are usually about trading, so don't keep re-prompting for them.
+  if (journalStore.getNoTradeDay(key)) return true
   const answers = journalStore.getChecklistAnswers(key)
   const questions = journalStore.checklistQuestions
   if (!questions.length) return true

@@ -55,7 +55,7 @@ const LEGACY_DATA_KEY = 'edgelog:journal'
 // was null/undefined — while `sections` didn't). So "empty" is judged by
 // content, the same way dailyEntries/weeklyEntries already decide whether
 // an entry has anything worth keeping unread state for.
-const ENTRY_FIELDS = ['sections', 'checklist', 'image']
+const ENTRY_FIELDS = ['sections', 'checklist', 'image', 'noTradeDay']
 function isEmptyField(field, value) {
   if (value === undefined || value === null) return true
   if (field === 'sections') {
@@ -65,7 +65,7 @@ function isEmptyField(field, value) {
   if (field === 'checklist') {
     return typeof value !== 'object' || Object.keys(value).length === 0
   }
-  if (field === 'image') {
+  if (field === 'image' || field === 'noTradeDay') {
     return !value
   }
   return false
@@ -81,7 +81,8 @@ function entryHasContent(rawEntry) {
   if (!rawEntry) return false
   return !isEmptyField('sections', rawEntry.sections) ||
     !isEmptyField('checklist', rawEntry.checklist) ||
-    !isEmptyField('image', rawEntry.image)
+    !isEmptyField('image', rawEntry.image) ||
+    !isEmptyField('noTradeDay', rawEntry.noTradeDay)
 }
 
 function fillMissingFields(existing, incoming) {
@@ -345,6 +346,17 @@ export const useJournalStore = defineStore('journal', () => {
 
   async function setChecklistAnswers(dateKey, answers) {
     data.value = { ...data.value, [dateKey]: { ...(data.value[dateKey] || {}), checklist: answers } }
+    await saveEntryToCloud(dateKey, data.value[dateKey])
+  }
+
+  // "No-trade day" flag, set from the daily check-in modal.
+  function getNoTradeDay(dateKey) {
+    return !!data.value[dateKey]?.noTradeDay
+  }
+
+  // Saves the check-in modal's answers and no-trade flag in one write.
+  async function setCheckin(dateKey, answers, noTradeDay) {
+    data.value = { ...data.value, [dateKey]: { ...(data.value[dateKey] || {}), checklist: answers, noTradeDay: !!noTradeDay } }
     await saveEntryToCloud(dateKey, data.value[dateKey])
   }
 
@@ -725,6 +737,7 @@ export const useJournalStore = defineStore('journal', () => {
     load, markRead, isRead, getSections, setSections, deleteEntry, clearReadState, clearWeeklyData, clearAllData,
     defaultSections, weeklyDefaultSections, monthlyDefaultSections,
     setChecklistQuestions, removeChecklistQuestion, getChecklistAnswers, setChecklistAnswers,
+    getNoTradeDay, setCheckin,
     getEntryImage, setEntryImage, clearAllEntryImages, importEntries,
     applyChecklistQuestionsFromCloud, checklistQuestionsToCloudValue,
   }
