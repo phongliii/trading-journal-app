@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+- Journal: **No-trade day** toggle in the daily check-in. Marked days show a
+  "No-trade day" badge on the check-in card and no longer re-prompt for the
+  check-in questions.
+
 ### Fixed
 - Journal: a chart image added to a day with no trades didn't show (it was
   only rendered alongside the trade stats).

@@ -10,6 +10,7 @@
         </button>
       </TooltipWrap>
     </div>
+    <div v-if="noTradeDay" class="inline-flex items-center bg-surface-3 text-ink-muted text-2xs font-medium rounded-full px-2.5 py-0.5 mb-2">No-trade day</div>
     <div class="text-xs text-ink-muted leading-loose pr-6">
       <div v-for="(q, i) in questions" :key="q.id">
         {{ i + 1 }}. {{ q.text }}
@@ -26,6 +27,7 @@ import TooltipWrap from '@/components/ui/TooltipWrap.vue'
 defineProps({
   questions: { type: Array, required: true },
   answers:   { type: Object, default: () => ({}) },
+  noTradeDay: { type: Boolean, default: false },
 })
 defineEmits(['edit'])
 </script>
