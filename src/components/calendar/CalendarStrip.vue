@@ -46,8 +46,7 @@
         </div>
         <!-- Marked "No-trade day" in the Journal check-in -->
         <template v-else-if="!day.isFuture && isNoTradeDay(day.date)">
-          <div class="absolute inset-1.5 border border-dashed border-border-strong rounded-lg pointer-events-none" />
-          <div class="relative text-sm text-ink-muted">No trade</div>
+          <div class="text-sm text-ink-muted">No trade</div>
         </template>
         <div v-else-if="!day.isFuture" class="space-y-1">
           <div class="font-mono text-sm font-bold leading-none text-ink-faint/40">$0.00</div>

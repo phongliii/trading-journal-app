@@ -8,7 +8,7 @@
   longer re-prompt for them. The questions are hidden in the check-in while
   the toggle is on.
 - Calendar and the Dashboard's weekly calendar show a no-trade day as a
-  dashed "No trade" cell instead of "$0.00 / 0 trades".
+  "No trade" instead of "$0.00 / 0 trades".
 
 ### Fixed
 - Journal: a chart image added to a day with no trades didn't show (it was
