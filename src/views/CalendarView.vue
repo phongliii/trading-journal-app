@@ -41,9 +41,9 @@
             cell.inMonth && cell.isFuture ? 'opacity-35' : '',
             cell.inMonth && !cell.isFuture && cell.trades > 0 && cell.pnl > 0 ? 'bg-up/5' : '',
             cell.inMonth && !cell.isFuture && cell.trades > 0 && cell.pnl < 0 ? 'bg-down/5' : '',
-            !cell.isFuture && hasDailyEntry(cell.date) ? 'hover:bg-surface-3/40 cursor-pointer' : '',
+            !cell.isFuture ? 'hover:bg-surface-3/40 cursor-pointer' : '',
           ]"
-          @click="!cell.isFuture && goToJournalDate(cell.date)">
+          @click="!cell.isFuture && onDayClick(cell.date, $event, cell)">
 
           <!-- Date row -->
           <div class="flex items-center justify-between mb-2">
@@ -204,6 +204,8 @@
       </ChartTooltip>
     </div>
 
+
+    <AddNotePopover :target="noteTarget" @confirm="confirmNote" @cancel="closeNote" />
   </div>
 </template>
 
@@ -215,6 +217,8 @@ import { useTimezoneStore } from '@/stores/timezone'
 import { fmt, fmtPct, computeStats, aggregateTrades } from '@/lib/stats'
 import { weekKey } from '@/lib/journalKeys'
 import HolidayIcon from '@/components/calendar/HolidayIcon.vue'
+import AddNotePopover from '@/components/calendar/AddNotePopover.vue'
+import { useCalendarNotes } from '@/composables/useCalendarNotes'
 import CompactValue from '@/components/ui/CompactValue.vue'
 import StatsPill from '@/components/ui/StatsPill.vue'
 import ChartTooltip from '@/components/ui/ChartTooltip.vue'
@@ -230,11 +234,12 @@ const MONTHS = ['January','February','March','April','May','June','July','August
 const router = useRouter()
 const tradesStore  = useTradesStore()
 const journalStore = useJournalStore()
+// Day clicks: popover with Close + Open note / Create note.
+const { noteTarget, onDayClick, confirmNote, closeNote } = useCalendarNotes()
 const tzStore      = useTimezoneStore()
 
-// Day and week journal entries are keyed differently ('yyyy-MM-dd' vs
-// 'yyyy-Wnn'), but "does an entry exist for this key" and "navigate to it"
-// are otherwise identical — shared here instead of duplicated per-kind.
+// Week-total cell: "does a weekly entry exist" and "navigate to it". (Day
+// cells use useCalendarNotes' popover instead.)
 // weekKey() itself lives in lib/journalKeys.js since the Journal's date picker
 // builds the same key when creating a weekly note.
 function hasJournalEntry(key, list) {
@@ -245,10 +250,8 @@ function goToJournal(key, list, queryParam) {
   router.push({ path: '/journal', query: { [queryParam]: key } })
 }
 
-const hasDailyEntry  = (date) => hasJournalEntry(format(date, 'yyyy-MM-dd'), journalStore.dailyEntries)
 const isNoTradeDay   = (date) => journalStore.getNoTradeDay(format(date, 'yyyy-MM-dd'))
 const hasWeeklyEntry = (mondayDate) => hasJournalEntry(weekKey(mondayDate), journalStore.weeklyEntries)
-const goToJournalDate = (date) => goToJournal(format(date, 'yyyy-MM-dd'), journalStore.dailyEntries, 'date')
 const goToJournalWeek = (mondayDate) => goToJournal(weekKey(mondayDate), journalStore.weeklyEntries, 'week')
 
 const current  = ref(tzStore.localDateObj())

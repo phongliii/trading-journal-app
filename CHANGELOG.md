@@ -9,6 +9,9 @@
   the toggle is on.
 - Calendar and the Dashboard's weekly calendar show a no-trade day as
   "No trade" instead of "$0.00 / 0 trades".
+- Calendar and the Dashboard's weekly calendar: every past day is now
+  clickable and opens a small popup with **Close** and **Open note** (the day
+  already has a Journal page) or **Create note** (it doesn't).
 
 ### Fixed
 - Journal: creating (or jumping to) a weekly note reset the quarter filter to
