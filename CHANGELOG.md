@@ -12,7 +12,8 @@
 - Calendar and the Dashboard's weekly calendar: every past day is now
   clickable. Clicking one replaces the cell's content with **Open note** (the
   day already has a Journal page) or **Create note** (it doesn't), plus
-  **Close**.
+  **Close**. Week total cells work the same way for the weekly note, and a
+  clicked day from the previous/next month isn't faded while its options show.
 
 ### Fixed
 - Journal: creating (or jumping to) a weekly note reset the quarter filter to

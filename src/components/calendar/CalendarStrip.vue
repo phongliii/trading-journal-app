@@ -64,9 +64,9 @@
       <div class="relative min-h-[100px] border-l border-border bg-surface-3/20 p-2.5"
         :class="[
           weekPnl > 0 ? 'bg-up/5' : weekPnl < 0 ? 'bg-down/5' : '',
-          hasWeeklyEntry(week[1].date) ? 'cursor-pointer hover:bg-surface-3/40' : '',
+          !week[1].isFuture ? 'cursor-pointer hover:bg-surface-3/40' : '',
         ]"
-        @click="goToJournalWeek(week[1].date)">
+        @click="!week[1].isFuture && onWeekClick(week[1].date, $event)">
         <div class="flex items-center justify-between mb-2">
           <span class="text-xs font-bold text-ink">{{ weekLabel }}</span>
         </div>
@@ -82,6 +82,9 @@
         </div>
         <div v-if="weekPnl !== 0" class="absolute bottom-0 left-0 right-0 h-0.5"
           :class="weekPnl >= 0 ? 'bg-up' : 'bg-down'" />
+
+        <DayNoteOverlay v-if="isWeekNoteOpen(week[1].date)" :has-entry="noteTarget.hasEntry"
+          @confirm="confirmNote" @close="closeNote" />
       </div>
     </div>
 
@@ -92,7 +95,6 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { fmtPct, aggregateTrades } from '@/lib/stats'
-import { weekKey } from '@/lib/journalKeys'
 import { useJournalStore } from '@/stores/journal'
 import { useTimezoneStore } from '@/stores/timezone'
 import CompactValue from '@/components/ui/CompactValue.vue'
@@ -100,30 +102,15 @@ import { startOfWeek, endOfWeek, eachDayOfInterval, format, addWeeks, startOfMon
 import HolidayIcon from '@/components/calendar/HolidayIcon.vue'
 import DayNoteOverlay from '@/components/calendar/DayNoteOverlay.vue'
 import { useCalendarNotes } from '@/composables/useCalendarNotes'
-import { useRouter } from 'vue-router'
 
 const props = defineProps({ trades: { type: Array, required: true } })
 
 const journalStore = useJournalStore()
 // Day clicks: overlay with Open note / Create note + Close.
-const { noteTarget, isNoteOpen, onDayClick, confirmNote, closeNote } = useCalendarNotes()
+const { noteTarget, isNoteOpen, isWeekNoteOpen, onDayClick, onWeekClick, confirmNote, closeNote } = useCalendarNotes()
 const tzStore = useTimezoneStore()
-const router = useRouter()
-
-// Week-total cell: "does a weekly entry exist" and "navigate to it". (Day
-// cells use useCalendarNotes' popover instead.)
-// Same helpers as CalendarView.vue; weekKey() itself lives in lib/journalKeys.js.
-function hasJournalEntry(key, list) {
-  return list.some(e => e.key === key)
-}
-function goToJournal(key, list, queryParam) {
-  if (!hasJournalEntry(key, list)) return
-  router.push({ path: '/journal', query: { [queryParam]: key } })
-}
 
 const isNoTradeDay   = (date) => journalStore.getNoTradeDay(format(date, 'yyyy-MM-dd'))
-const hasWeeklyEntry = (mondayDate) => hasJournalEntry(weekKey(mondayDate), journalStore.weeklyEntries)
-const goToJournalWeek = (mondayDate) => goToJournal(weekKey(mondayDate), journalStore.weeklyEntries, 'week')
 
 const offset = ref(0)
 function prev()    { offset.value-- }

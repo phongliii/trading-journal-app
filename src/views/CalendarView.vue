@@ -37,7 +37,8 @@
           class="relative min-h-[100px] border-r border-border p-2.5 transition-colors"
           :class="[
             ri === calendarRows.length - 1 && ci === 0 ? 'rounded-bl-2xl' : '',
-            !cell.inMonth ? 'opacity-20' : '',
+            // Not faded while its note overlay is showing.
+            !cell.inMonth && !isNoteOpen(cell.date) ? 'opacity-20' : '',
             cell.inMonth && cell.isFuture ? 'opacity-35' : '',
             cell.inMonth && !cell.isFuture && cell.trades > 0 && cell.pnl > 0 ? 'bg-up/5' : '',
             cell.inMonth && !cell.isFuture && cell.trades > 0 && cell.pnl < 0 ? 'bg-down/5' : '',
@@ -92,9 +93,9 @@
         <div class="relative min-h-[100px] border-l border-border bg-surface-3/20 p-2.5 transition-colors"
           :class="[
             row.weekPnl > 0 ? 'bg-up/5' : row.weekPnl < 0 ? 'bg-down/5' : '',
-            hasWeeklyEntry(row.days[1].date) ? 'cursor-pointer hover:bg-surface-3/40' : '',
+            !row.days[1].isFuture ? 'cursor-pointer hover:bg-surface-3/40' : '',
           ]"
-          @click="goToJournalWeek(row.days[1].date)">
+          @click="!row.days[1].isFuture && onWeekClick(row.days[1].date, $event)">
           <div class="flex items-center justify-between mb-2">
             <span class="text-xs font-bold text-ink">Week {{ ri + 1 }}</span>
           </div>
@@ -111,6 +112,9 @@
           <div v-if="row.weekPnl !== 0"
             class="absolute bottom-0 left-0 right-0 h-0.5"
             :class="row.weekPnl >= 0 ? 'bg-up' : 'bg-down'" />
+
+          <DayNoteOverlay v-if="isWeekNoteOpen(row.days[1].date)" :has-entry="noteTarget.hasEntry"
+            @confirm="confirmNote" @close="closeNote" />
         </div>
       </div>
     </div>
@@ -217,7 +221,6 @@ import { useTradesStore } from '@/stores/trades'
 import { useJournalStore } from '@/stores/journal'
 import { useTimezoneStore } from '@/stores/timezone'
 import { fmt, fmtPct, computeStats, aggregateTrades } from '@/lib/stats'
-import { weekKey } from '@/lib/journalKeys'
 import HolidayIcon from '@/components/calendar/HolidayIcon.vue'
 import DayNoteOverlay from '@/components/calendar/DayNoteOverlay.vue'
 import { useCalendarNotes } from '@/composables/useCalendarNotes'
@@ -229,32 +232,16 @@ import {
   startOfWeek, eachWeekOfInterval, startOfMonth, endOfMonth,
   endOfWeek, eachDayOfInterval, isSameMonth,
 } from 'date-fns'
-import { useRouter } from 'vue-router'
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
-const router = useRouter()
 const tradesStore  = useTradesStore()
 const journalStore = useJournalStore()
 // Day clicks: overlay with Open note / Create note + Close.
-const { noteTarget, isNoteOpen, onDayClick, confirmNote, closeNote } = useCalendarNotes()
+const { noteTarget, isNoteOpen, isWeekNoteOpen, onDayClick, onWeekClick, confirmNote, closeNote } = useCalendarNotes()
 const tzStore      = useTimezoneStore()
 
-// Week-total cell: "does a weekly entry exist" and "navigate to it". (Day
-// cells use useCalendarNotes' popover instead.)
-// weekKey() itself lives in lib/journalKeys.js since the Journal's date picker
-// builds the same key when creating a weekly note.
-function hasJournalEntry(key, list) {
-  return list.some(e => e.key === key)
-}
-function goToJournal(key, list, queryParam) {
-  if (!hasJournalEntry(key, list)) return
-  router.push({ path: '/journal', query: { [queryParam]: key } })
-}
-
 const isNoTradeDay   = (date) => journalStore.getNoTradeDay(format(date, 'yyyy-MM-dd'))
-const hasWeeklyEntry = (mondayDate) => hasJournalEntry(weekKey(mondayDate), journalStore.weeklyEntries)
-const goToJournalWeek = (mondayDate) => goToJournal(weekKey(mondayDate), journalStore.weeklyEntries, 'week')
 
 const current  = ref(tzStore.localDateObj())
 const viewMode = ref('month') // 'month' | 'year' | 'decade'
