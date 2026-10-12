@@ -6,18 +6,6 @@
     </div>
 
     <div class="flex items-center gap-2">
-      <!-- Period selector -->
-      <div v-if="showPeriod" class="flex items-center gap-0.5 bg-surface-2 border border-border rounded-lg p-0.5">
-        <button v-for="p in periods" :key="p.val"
-          @click="tradesStore.period = p.val"
-          class="px-3 py-1 rounded-md text-xs font-medium transition-all"
-          :class="tradesStore.period === p.val
-            ? 'bg-surface-4 text-ink shadow-sm'
-            : 'text-ink-muted hover:text-ink'">
-          {{ p.label }}
-        </button>
-      </div>
-
       <!-- Import CSV -->
       <CsvImport ref="csvImporter">
         <template #default="{ trigger }">
@@ -38,25 +26,14 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { useTradesStore } from '@/stores/trades'
 import { useTimezoneStore } from '@/stores/timezone'
 import { format } from 'date-fns'
 import CsvImport from '@/components/ui/CsvImport.vue'
 
 const route = useRoute()
-const tradesStore = useTradesStore()
 const tzStore = useTimezoneStore()
 
 const PAGE_TITLES = { dashboard: 'Dashboard', trades: 'Trade Logs', calendar: 'Calendar', journal: 'Journal', settings: 'Settings' }
 const pageTitle  = computed(() => PAGE_TITLES[route.name] || 'EdgeLog')
 const dateLabel  = computed(() => format(tzStore.localDateObj(), 'EEEE, MMMM d, yyyy'))
-const showPeriod = computed(() => route.name === 'dashboard')
-
-const periods = [
-  { label: '30d', val: 30  },
-  { label: '60d', val: 60  },
-  { label: '90d', val: 90  },
-  { label: '1Y',  val: 365 },
-  { label: 'All', val: 0   },
-]
 </script>

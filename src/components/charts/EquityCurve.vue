@@ -10,8 +10,9 @@
 <script setup>
 import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue'
 import { Chart, LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
-import { format, parseISO, eachWeekOfInterval, eachMonthOfInterval,
-         startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays, getWeek } from 'date-fns'
+import { format, parseISO, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval,
+         endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
+import { rangeStart, rangeMode } from '@/lib/realizedPnl'
 import { createExternalTooltip } from '@/lib/chartTooltip'
 import { useTimezoneStore } from '@/stores/timezone'
 
@@ -40,7 +41,7 @@ const zeroLinePlugin = {
 
 const props = defineProps({
   curve:  { type: Array,  default: () => [] }, // [{ date, value }] currently-plotted curve (equity or balance)
-  period: { type: Number, default: 30 },
+  range:  { type: String, default: '1M' }, // '1W' | '1M' | '3M' | 'YTD' | 'ALL' (see lib/realizedPnl.js)
   // Trading P&L alone (never moved by deposits/withdrawals) and the
   // capital base (starting balance adjusted only by deposits/withdrawals,
   // never by trading P&L) — together these give a % that's pure trading
@@ -71,33 +72,28 @@ function buildChart() {
   const today = tzStore.localDateObj()
   let labels, isoDates
 
-  if (props.period === 30) {
-    // Daily — one point per day
-    const start = subDays(today, 29)
-    const days = []
-    let d = new Date(start)
-    while (d <= today) { days.push(new Date(d)); d.setDate(d.getDate() + 1) }
+  // Same windows and bucketing as the Realized P&L card's tabs.
+  const firstDate = props.curve[0]?.date ? parseISO(props.curve[0].date) : null
+  const start = rangeStart(props.range, today, firstDate)
+  const mode  = rangeMode(props.range, start, today)
 
+  if (mode === 'daily') {
+    // One point per day
+    const days = eachDayOfInterval({ start, end: today })
     labels   = days.map(d => format(d, 'MMM d'))
     isoDates = days.map(d => format(d, 'yyyy-MM-dd'))
 
-  } else if (props.period === 0) {
-    // All → monthly
-    const firstDate = props.curve[0]?.date ? parseISO(props.curve[0].date) : subDays(today, 364)
-    const months = eachMonthOfInterval({ start: startOfMonth(firstDate), end: today })
+  } else if (mode === 'monthly') {
+    const months = eachMonthOfInterval({ start: startOfMonth(start), end: today })
     labels   = months.map(m => format(m, 'MMM yy'))
     isoDates = months.map(m => format(endOfMonth(m) > today ? today : endOfMonth(m), 'yyyy-MM-dd'))
 
   } else {
-    // 60d / 90d / 1Y → weekly
-    const start = subDays(today, props.period - 1)
-    const weekStarts = eachWeekOfInterval(
-      { start: startOfWeek(start, { weekStartsOn: 0 }), end: today },
-      { weekStartsOn: 0 }
-    )
-    labels   = weekStarts.map(ws => `W${getWeek(ws, { weekStartsOn: 0 })}`)
+    // Monday-start weeks, like the Realized P&L card
+    const weekStarts = eachWeekOfInterval({ start, end: today }, { weekStartsOn: 1 })
+    labels   = weekStarts.map(ws => format(ws, 'MMM d'))
     isoDates = weekStarts.map(ws => {
-      const we = endOfWeek(ws, { weekStartsOn: 0 })
+      const we = endOfWeek(ws, { weekStartsOn: 1 })
       return format(we > today ? today : we, 'yyyy-MM-dd')
     })
   }
@@ -110,9 +106,9 @@ function buildChart() {
   // Up/down (and thus the line color) is judged the same way Robinhood-style
   // charts do it: relative to the start of the selected range, not just
   // whether the raw number is above zero.
-  const rangeStart = data[0] ?? 0
-  const rangeEnd   = data[data.length - 1] ?? 0
-  const isPos = (rangeEnd - rangeStart) >= 0
+  const firstValue = data[0] ?? 0
+  const lastValue  = data[data.length - 1] ?? 0
+  const isPos = (lastValue - firstValue) >= 0
   const color = isPos ? '#00c896' : '#ef4444'
 
   // % shown alongside the $ amount in the tooltip: pure trading P&L against
@@ -186,6 +182,6 @@ function buildChart() {
 }
 
 onMounted(buildChart)
-watch(() => [props.curve, props.period, props.pnlCurve, props.fundBaseCurve, props.baseBalance, props.hasBalance], buildChart, { deep: true })
+watch(() => [props.curve, props.range, props.pnlCurve, props.fundBaseCurve, props.baseBalance, props.hasBalance], buildChart, { deep: true })
 onBeforeUnmount(() => { chart?.destroy(); tooltipCleanup() })
 </script>

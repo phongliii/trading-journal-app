@@ -1,10 +1,8 @@
 // Account balance math for stores/balance.js, kept pure so it can be tested.
 //
-// `trades` must be EVERY trade in the portfolio — never a period-filtered
-// list. The balance used to add tradesStore.stats.totalPnl, which only
-// covers the top bar's selected period (30 days by default), so the balance
-// moved by itself each day as old trades fell out of that window (and
-// changed when the period was switched).
+// `trades` must be EVERY trade in the portfolio — never a date-filtered
+// list. (The balance once added the P&L of only the last 30 days' trades, so
+// it moved by itself each day as old trades fell out of that window.)
 
 const sumPnl = (trades) => trades.reduce((s, t) => s + t.pnl, 0)
 

@@ -1,11 +1,8 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { adapter } from '@/lib/storage'
-import { computeStats, groupByMonth, groupByDow, groupBySymbol, calendarDays } from '@/lib/stats'
-import { subDays, parseISO } from 'date-fns'
+import { computeStats } from '@/lib/stats'
 import { useAccountsStore } from './accounts'
-
-const PERIOD_KEY = 'edgelog:period'
 
 // Exact content comparison (not just length) — used by doLoad() to decide
 // whether a reload actually found anything different before replacing the
@@ -22,11 +19,6 @@ export const useTradesStore = defineStore('trades', () => {
   const trades  = ref([])
   const loading = ref(false)
   const error   = ref(null)
-
-  // Restore saved period, default 7
-  const savedPeriod = localStorage.getItem(PERIOD_KEY)
-  const period = ref(savedPeriod ? Number(savedPeriod) : 30)
-  watch(period, v => localStorage.setItem(PERIOD_KEY, String(v)))
 
   // Coalesce concurrent calls into one shared in-flight promise instead of
   // starting a second, overlapping doLoad() — same fix, same reasoning, as
@@ -111,43 +103,16 @@ export const useTradesStore = defineStore('trades', () => {
     trades.value = []
   }
 
-  // ── Period filter (7 | 30 | 60 | 90 | 0=all) ─────────────────
-  const filteredTrades = computed(() => {
-    if (period.value === 0) return trades.value
-    const cutoff = subDays(new Date(), period.value)
-    return trades.value.filter(t => {
-      if (!t.sold_at) return true
-      return parseISO(t.sold_at) >= cutoff
-    })
-  })
-  // ── Analytics ─────────────────────────────────────────────────
-  const stats      = computed(() => computeStats(filteredTrades.value))
-  const monthPerf  = computed(() => groupByMonth(filteredTrades.value))
-  const dowPerf    = computed(() => groupByDow(filteredTrades.value))
-  const symbolPerf = computed(() => groupBySymbol(filteredTrades.value))
-  const calendar   = computed(() => calendarDays(filteredTrades.value, 7))
-
-  const totalFees  = computed(() => {
-    const sum = filteredTrades.value.reduce((s, t) => s + (t.fees || 0), 0)
+  // ── Analytics (every trade — there's no global period filter) ─────
+  const stats     = computed(() => computeStats(trades.value))
+  const totalFees = computed(() => {
+    const sum = trades.value.reduce((s, t) => s + (t.fees || 0), 0)
     return Math.round(sum * 100) / 100
   })
 
-  // Day win rate = % of trading days that were profitable
-  const dayWinRate = computed(() => {
-    const byDay = {}
-    for (const t of filteredTrades.value) {
-      if (!t.sold_at) continue
-      const key = new Date(t.sold_at).toDateString()
-      byDay[key] = (byDay[key] || 0) + t.pnl
-    }
-    const days = Object.values(byDay)
-    if (!days.length) return 0
-    return (days.filter(p => p > 0).length / days.length) * 100
-  })
-
   return {
-    trades, filteredTrades, loading, error, period,
-    stats, monthPerf, dowPerf, symbolPerf, calendar, totalFees, dayWinRate,
+    trades, loading, error,
+    stats, totalFees,
     load, insertTrades, deleteTrade, deleteTrades, updateTrade, clearAll,
   }
 })

@@ -40,7 +40,7 @@
       <StatCard label="Trades"
         :value="String(stats.total)"
         value-class="text-ink"
-        tooltip="Number of trades closed in this period." />
+        tooltip="Number of trades closed, all time." />
 
       <StatCard label="Win Rate"
         :value="fmtPct(stats.winRate)"
@@ -62,14 +62,14 @@
         tooltip="Ratio of total profits to total losses." />
 
       <StatCard label="Max Drawdown"
-        :raw-value="periodDrawdown.maxDrawdown"
+        :raw-value="allTimeDrawdown.maxDrawdown"
         value-class="text-down"
         tooltip="Maximum peak-to-trough equity decline, computed from realized cash flow including fees at time of charge." />
     </section>
 
     <!-- Daily P&L + Equity Curve -->
     <section class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-      <DashboardCard title="Realized P&L" info-next tooltip="Net P&L (after fees) from closed trades, for the selected range. Bars are days for 1W and 1M, weeks for 3M and YTD, and months for ALL once you have more than a year of history. Independent of the period selected above.">
+      <DashboardCard title="Realized P&L" info-next tooltip="Net P&L (after fees) from closed trades, for the selected range. Bars are days for 1W and 1M, weeks for 3M and YTD, and months for ALL once you have more than a year of history.">
         <template #actions>
           <RangeTabs v-model="realizedRange" :options="REALIZED_RANGES" storage-key="edgelog:realizedRange" />
         </template>
@@ -81,15 +81,18 @@
         </div>
       </DashboardCard>
 
-      <DashboardCard :tooltip="equityMode === 'balance' ? 'Account balance over time, including deposits and withdrawals.' : 'Cumulative net P&L (after fees) over time for the selected period.'">
+      <DashboardCard info-next :tooltip="equityMode === 'balance' ? 'Account balance over time, including deposits and withdrawals, for the selected range.' : 'Cumulative net P&L (after fees) over the selected range.'">
         <template #header>
           <EquityModeTabs v-model="equityMode" :disabled="!balanceStore.hasBalance" />
         </template>
+        <template #actions>
+          <RangeTabs v-model="equityRange" :options="REALIZED_RANGES" storage-key="edgelog:equityRange" />
+        </template>
         <div class="h-44">
           <EquityCurve
-            :curve="equityMode === 'balance' ? balanceCurve : stats.equityCurve"
-            :period="tradesStore.period"
-            :pnl-curve="stats.equityCurve"
+            :curve="equityMode === 'balance' ? balanceCurve : rangePnlCurve"
+            :range="equityRange"
+            :pnl-curve="rangePnlCurve"
             :fund-base-curve="fundBaseCurve"
             :base-balance="balanceStore.correctStarting"
             :has-balance="balanceStore.hasBalance" />
@@ -130,7 +133,7 @@
           </DashboardCard>
 
           <DashboardCard title="Largest Win / Loss" tooltip="Best and worst single trade ever.">
-            <SplitBarStat :win="allTimeStats.largestGain" :loss="allTimeStats.largestLoss" />
+            <SplitBarStat :win="stats.largestGain" :loss="stats.largestLoss" />
           </DashboardCard>
 
           <DashboardCard title="Total Fees" tooltip="Total commissions and exchange fees paid.">
@@ -198,7 +201,7 @@ import BarList       from '@/components/ui/BarList.vue'
 import EquityCurve   from '@/components/charts/EquityCurve.vue'
 import DailyBarChart from '@/components/charts/DailyBarChart.vue'
 import RangeTabs from '@/components/ui/RangeTabs.vue'
-import { buildRealizedBuckets, REALIZED_RANGES } from '@/lib/realizedPnl'
+import { buildRealizedBuckets, rangeStart, REALIZED_RANGES } from '@/lib/realizedPnl'
 import CalendarStrip from '@/components/calendar/CalendarStrip.vue'
 import CsvImport     from '@/components/ui/CsvImport.vue'
 import DashboardCard from '@/components/ui/DashboardCard.vue'
@@ -214,8 +217,7 @@ const stats           = computed(() => tradesStore.stats)
 const pnlMode         = ref('gross')
 const equityMode      = ref('equity')
 
-// Realized P&L card: its own range tabs (independent of the dashboard-wide
-// period), computed from ALL trades so ranges longer than that period work.
+// Realized P&L card: its own range tabs, computed from ALL trades.
 const realizedRange = ref('1M')
 const realizedBars = computed(() => {
   const byDay = {}
@@ -227,6 +229,20 @@ const realizedBars = computed(() => {
   return Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b)).map(([date, pnl]) => ({ date, pnl }))
 })
 const realized = computed(() => buildRealizedBuckets(realizedBars.value, realizedRange.value, tzStore.localDateObj()))
+
+// Equity / Balance card: same range tabs as Realized P&L.
+const equityRange = ref('1M')
+// First day of the selected range, as 'yyyy-MM-dd' (null for ALL).
+const equityRangeFrom = computed(() => {
+  if (equityRange.value === 'ALL') return null
+  return format(rangeStart(equityRange.value, tzStore.localDateObj(), null), 'yyyy-MM-dd')
+})
+// Cumulative net P&L of just the trades in the range, starting from 0.
+const rangePnlCurve = computed(() => {
+  const from = equityRangeFrom.value
+  const inRange = from ? tradesStore.trades.filter(t => t.sold_at && t.sold_at.slice(0, 10) >= from) : tradesStore.trades
+  return computeStats(inRange).equityCurve
+})
 
 // Drives the skeleton below — true until trades, balance AND cashEvents
 // have ALL loaded at least once, not just trades. This used to gate on
@@ -242,7 +258,7 @@ const initialLoading = computed(() =>
 
 // Capital base (starting balance adjusted only by deposits/withdrawals, never
 // by trading P&L) — full history, so the running base at any date stays
-// accurate regardless of the selected period.
+// accurate regardless of the selected range.
 const fundBaseCurve = computed(() => {
   if (!balanceStore.hasBalance) return []
   return computeFundBaseCurve(balanceStore.fundTransactions, balanceStore.correctStarting)
@@ -251,36 +267,18 @@ const fundBaseCurve = computed(() => {
 const balanceCurve = computed(() => {
   if (!balanceStore.hasBalance) return []
   // Build the full curve from ALL history so cumulative values stay accurate,
-  // then slice to the selected period — matching how filteredTrades works.
+  // then slice to the selected range. (equityRangeFrom comes from the app's
+  // timezone-aware "today", not the raw browser Date.)
   const full = computeBalanceCurve(tradesStore.trades, balanceStore.fundTransactions, balanceStore.correctStarting)
-  if (tradesStore.period === 0) return full
-  const cutoff = subDaysISO(tradesStore.period)
-  return full.filter(p => p.date.slice(0, 10) >= cutoff)
+  const from = equityRangeFrom.value
+  return from ? full.filter(p => p.date.slice(0, 10) >= from) : full
 })
-const allTimeStats    = computed(() => computeStats(tradesStore.trades))
 const totalGrossPnl = computed(() =>
-  Math.round(tradesStore.filteredTrades.reduce((s, t) => s + (t.gross_pnl ?? t.pnl), 0) * 100) / 100
+  Math.round(tradesStore.trades.reduce((s, t) => s + (t.gross_pnl ?? t.pnl), 0) * 100) / 100
 )
 
-// Max Drawdown / Peak Equity using raw chronological cash events, filtered by period
-const periodDrawdown = computed(() => {
-  const period = tradesStore.period
-  const from = period === 0 ? null : subDaysISO(period)
-  return computeDrawdownFromEvents(cashEventsStore.events, from, null)
-})
-
-// `.toISOString()` reports the UTC date, which is wrong once you're west of
-// UTC in the evening (same bug fixed on the Export page) — subtract days
-// from the app's own timezone-aware "today" instead of the raw browser Date.
-// `localDateObj()` already represents that calendar day as local fields, so
-// day math + a plain field readout (not another Intl/timezone pass) keeps it
-// from getting shifted a second time.
-function subDaysISO(days) {
-  const d = tzStore.localDateObj()
-  d.setDate(d.getDate() - days)
-  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
+// Max Drawdown / Peak Equity using raw chronological cash events, all time
+const allTimeDrawdown = computed(() => computeDrawdownFromEvents(cashEventsStore.events, null, null))
 
 const winLossRatio = computed(() => {
   if (!stats.value.avgLoss || !stats.value.avgWin) return '—'
@@ -288,8 +286,7 @@ const winLossRatio = computed(() => {
 })
 
 // Performance by Month / Performance by Day of Week each get their own
-// period control, independent of the dashboard's global 30d/60d/90d/1Y/All
-// selector — groupByMonth()/groupByDow() bucket purely by month-of-year or
+// period control — groupByMonth()/groupByDow() bucket purely by month-of-year or
 // day-of-week with no year discrimination, so feeding them a period that
 // spans multiple years silently merges e.g. every January together. A
 // rolling/calendar-scoped window sidesteps that instead of requiring a
@@ -306,7 +303,7 @@ const DOW_PERIOD_OPTIONS = [
   { value: 'lastQuarter', label: 'Last quarter' },
   { value: 'all',         label: 'All' },
 ]
-// Persisted like tradesStore's own 30d/60d/90d period (stores/trades.js) —
+// Persisted in localStorage —
 // otherwise these two reset to their defaults on every reload, losing
 // whatever Performance window you'd set up. The month-click sync
 // (dowMonthSync, below) is deliberately NOT persisted — it's a one-off

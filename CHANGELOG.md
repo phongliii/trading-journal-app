@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Changed
+- **Removed the top bar's period picker** (30d / 60d / 90d / 1Y / All). It
+  also silently limited the Trades page to that period; the Trades page now
+  always lists every trade (use its own date filter to narrow down).
+- Dashboard: the **Equity / Balance** chart has its own range tabs
+  (1W / 1M / 3M / YTD / ALL), like the Realized P&L card. The stat cards
+  (Trades, Win Rate, Total P&L, Profit Factor, Max Drawdown), Avg Win / Loss
+  and Total Fees are now all-time.
+
+### Removed
+- The unused Analytics page (it had no route or menu link).
+
 ### Added
 - Journal: **No-trade day** toggle in the daily check-in. Marked days show a
   "No-trade day" badge on the check-in card instead of the questions, and no

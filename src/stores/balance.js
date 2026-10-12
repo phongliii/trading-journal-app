@@ -107,8 +107,7 @@ export const useBalanceStore = defineStore('balance', () => {
   const totalFundFlow     = computed(() => fundTransactions.value.reduce((s, t) => s + t.amount, 0))
   const hasBalance    = computed(() => data.value.rawStarting !== null && data.value.rawStarting !== undefined)
 
-  // See lib/balance.js. Uses tradesStore.trades (every trade), NOT
-  // tradesStore.stats/filteredTrades, which only cover the top bar's period.
+  // See lib/balance.js. Always every trade (tradesStore.trades).
   const correctStarting = computed(() =>
     computeCorrectStarting(data.value, fundTransactions.value, tradesStore.trades))
   const currentBalance = computed(() =>

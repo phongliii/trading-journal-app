@@ -229,13 +229,13 @@ const rangeEnd    = ref('')
 
 const dayTrades = computed(() => {
   if (rangeStart.value && rangeEnd.value) {
-    return tradesStore.filteredTrades.filter(t => {
+    return tradesStore.trades.filter(t => {
       const d = t.sold_at?.slice(0, 10)
       return d && d >= rangeStart.value && d <= rangeEnd.value
     })
   }
   if (filterDate.value) {
-    return tradesStore.filteredTrades.filter(t => t.sold_at?.slice(0, 10) === filterDate.value)
+    return tradesStore.trades.filter(t => t.sold_at?.slice(0, 10) === filterDate.value)
   }
   return []
 })
@@ -316,7 +316,7 @@ const filters = [
 ]
 
 const shown = computed(() => {
-  let list = tradesStore.filteredTrades
+  let list = tradesStore.trades
   if (search.value) {
     const q = search.value.toLowerCase()
     list = list.filter(t => t.symbol?.toLowerCase().includes(q))
