@@ -88,6 +88,9 @@ const emit = defineEmits(['update:modelValue'])
 
 const editorEl = ref(null)
 let quill = null
+// The last value this editor emitted, so the modelValue watch below can tell
+// its own edits coming back from a genuinely new value from the parent.
+let lastEmitted = null
 
 const active = reactive({
   bold: false, italic: false, underline: false, strike: false,
@@ -125,9 +128,12 @@ onMounted(async () => {
   if (props.modelValue) quill.root.innerHTML = props.modelValue
 
   quill.on('text-change', () => {
-    emit('update:modelValue', quill.root.innerHTML)
-    // Check if empty — force placeholder
-    if (quill.getText().trim() === '') quill.root.innerHTML = ''
+    // An editor holding only blank lines is saved as '' (so it counts as
+    // empty), but the DOM is left alone — rewriting innerHTML here used to
+    // throw away the new line and send the cursor back to the start when
+    // Enter was pressed in an empty editor.
+    lastEmitted = quill.getText().trim() === '' ? '' : quill.root.innerHTML
+    emit('update:modelValue', lastEmitted)
   })
 
   quill.on('selection-change', (range) => {
@@ -150,8 +156,16 @@ function updateActive() {
   active.size       = fmt.size || ''
 }
 
+// Only replace the content for a value that didn't come from this editor
+// (e.g. switching to another entry). Comparing against the live innerHTML
+// instead misfired right after Enter with a format active (bold, a heading
+// size…): Quill adds a cursor placeholder span after emitting, so the HTML
+// no longer matched, the content got rewritten, and the cursor jumped to the
+// start of the first line.
 watch(() => props.modelValue, val => {
-  if (quill && quill.root.innerHTML !== val) quill.root.innerHTML = val || ''
+  if (!quill || val === lastEmitted) return
+  lastEmitted = val
+  quill.root.innerHTML = val || ''
 })
 
 onBeforeUnmount(() => { quill = null })

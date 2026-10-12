@@ -28,6 +28,9 @@
   clicked day from the previous/next month isn't faded while its options show.
 
 ### Fixed
+- **Rich-text notes:** pressing Enter with bold (or another style) active,
+  or in an empty note, sent the cursor back to the start of the first line
+  (and in an empty note dropped the new line).
 - **Account Balance changed by itself** from day to day: it only added the
   P&L of trades inside the top bar's period (30 days by default), so it moved
   as old trades aged out of that window, and when the period was switched. It
