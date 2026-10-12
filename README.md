@@ -43,7 +43,6 @@ src/
     ├── DashboardView       7-day strip · equity curve · 6 chart panels
     ├── TradesView          searchable/sortable table · CSV import · drawer
     ├── CalendarView        full month grid with per-day P&L
-    ├── AnalyticsView       deep stats · symbol breakdown
     └── SettingsView        storage info · export · Supabase instructions
 ```
 
