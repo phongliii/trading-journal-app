@@ -16,6 +16,10 @@
   clicked day from the previous/next month isn't faded while its options show.
 
 ### Fixed
+- **Account Balance changed by itself** from day to day: it only added the
+  P&L of trades inside the top bar's period (30 days by default), so it moved
+  as old trades aged out of that window, and when the period was switched. It
+  now uses every trade.
 - Journal: creating (or jumping to) a weekly note reset the quarter filter to
   "Show all" — it now switches to that week's quarter.
 - Journal: a chart image added to a day with no trades didn't show (it was

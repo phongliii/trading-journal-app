@@ -5,6 +5,7 @@ import { useAccountsStore } from './accounts'
 import { balanceAdapter } from '@/lib/balanceAdapter'
 import { useToast } from '@/composables/useToast'
 import { reportCloudError } from '@/lib/cloudErrors'
+import { computeCorrectStarting, computeCurrentBalance } from '@/lib/balance'
 
 // Cloud-only now (see lib/balanceAdapter.js) — no localStorage copy. `data`
 // starts empty and is populated by load() (called from App.vue once
@@ -106,39 +107,12 @@ export const useBalanceStore = defineStore('balance', () => {
   const totalFundFlow     = computed(() => fundTransactions.value.reduce((s, t) => s + t.amount, 0))
   const hasBalance    = computed(() => data.value.rawStarting !== null && data.value.rawStarting !== undefined)
 
-  // Correct starting = rawStarting - funds on or before earliest balance
-  // date - realized P&L from trades strictly before that date.
-  //
-  // rawStarting (from csvParser's parseBalanceHistory) is the broker's
-  // real account value at the START of day1 — day1's own realized P&L is
-  // already subtracted out there, but every trade that closed BEFORE day1
-  // is a real past event already baked into that number. currentBalance
-  // below adds tradesStore.stats.totalPnl, which sums EVERY trade
-  // currently in the store with no date filter — so without subtracting
-  // it back out here, any trade dated before day1 gets counted twice:
-  // once already inside rawStarting, once again via totalPnl. This used
-  // to only bite in a particular order ("import trades first, including
-  // ones older than your balance history's first day, then set up the
-  // balance" — the bug was in the DATA, not the order, but that's the
-  // workflow that surfaces it), and the equivalent subtraction already
-  // existed for fund transactions just below — trades just never got it.
-  const correctStarting = computed(() => {
-    if (!hasBalance.value) return 0
-    const day1 = data.value.earliestBalanceDate
-    if (!day1) return data.value.rawStarting ?? 0
-    const day1Funds = fundTransactions.value.filter(t => t.date <= day1).reduce((s, t) => s + t.amount, 0)
-    const priorPnl = tradesStore.trades
-      .filter(t => t.sold_at && t.sold_at.slice(0, 10) < day1)
-      .reduce((s, t) => s + t.pnl, 0)
-    return (data.value.rawStarting ?? 0) - day1Funds - priorPnl
-  })
-
-  // With balance: correctStarting + totalNetPnl + totalFundFlow
-  // Without balance: totalNetPnl only
-  const currentBalance = computed(() => {
-    if (!hasBalance.value) return tradesStore.stats.totalPnl
-    return correctStarting.value + tradesStore.stats.totalPnl + totalFundFlow.value
-  })
+  // See lib/balance.js. Uses tradesStore.trades (every trade), NOT
+  // tradesStore.stats/filteredTrades, which only cover the top bar's period.
+  const correctStarting = computed(() =>
+    computeCorrectStarting(data.value, fundTransactions.value, tradesStore.trades))
+  const currentBalance = computed(() =>
+    computeCurrentBalance(data.value, fundTransactions.value, tradesStore.trades))
 
   // Keep startingBalance as alias for display in settings
   const startingBalance = computed(() => data.value.rawStarting)
