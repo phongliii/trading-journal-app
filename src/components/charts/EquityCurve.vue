@@ -10,9 +10,8 @@
 <script setup>
 import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue'
 import { Chart, LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
-import { format, parseISO, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval,
-         endOfWeek, startOfMonth, endOfMonth, addDays } from 'date-fns'
-import { rangeStart, rangeMode } from '@/lib/realizedPnl'
+import { format, parseISO, eachDayOfInterval, isWeekend, differenceInCalendarDays } from 'date-fns'
+import { rangeStart } from '@/lib/realizedPnl'
 import { createExternalTooltip } from '@/lib/chartTooltip'
 import { useTimezoneStore } from '@/stores/timezone'
 
@@ -58,10 +57,17 @@ let chart = null
 const { handler: tooltipHandler, cleanup: tooltipCleanup } = createExternalTooltip()
 const hasData = computed(() => props.curve.length > 1)
 
-// Last known value at or before `iso` in a [{date, value}] curve, or `fallback`.
-function lastAtOrBefore(curveArr, iso, fallback) {
-  const pts = curveArr.filter(p => p.date && p.date.slice(0, 10) <= iso)
-  return pts.length ? pts[pts.length - 1].value : fallback
+// For each day in `isoDates` (ascending), the last value at or before that
+// day in a date-sorted [{date, value}] curve, or `fallback` before its first
+// point. One pass over both lists — the chart has a point per day now, so a
+// per-day scan of the whole curve got slow on long ranges.
+function valuesAt(curveArr, isoDates, fallback) {
+  const pts = curveArr.filter(p => p.date)
+  let i = 0, current = fallback
+  return isoDates.map(iso => {
+    while (i < pts.length && pts[i].date.slice(0, 10) <= iso) current = pts[i++].value
+    return current
+  })
 }
 
 function buildChart() {
@@ -70,50 +76,22 @@ function buildChart() {
   if (!props.curve.length) return
 
   const today = tzStore.localDateObj()
-  let labels, isoDates
-  let hoverTitles = null // tooltip titles when they differ from the axis labels
-
-  // Same windows and bucketing as the Realized P&L card's tabs.
+  // One point per day on every tab, so hovering always shows a single day.
+  // Saturdays/Sundays are skipped unless something is dated that day —
+  // their value would just repeat Friday's.
   const firstDate = props.curve[0]?.date ? parseISO(props.curve[0].date) : null
   const start = rangeStart(props.range, today, firstDate)
-  const mode  = rangeMode(props.range, start, today)
-
-  if (mode === 'daily') {
-    // One point per day
-    const days = eachDayOfInterval({ start, end: today })
-    labels   = days.map(d => format(d, 'MMM d'))
-    isoDates = days.map(d => format(d, 'yyyy-MM-dd'))
-
-  } else if (mode === 'monthly') {
-    const months = eachMonthOfInterval({ start: startOfMonth(start), end: today })
-    labels   = months.map(m => format(m, 'MMM yy'))
-    isoDates = months.map(m => format(endOfMonth(m) > today ? today : endOfMonth(m), 'yyyy-MM-dd'))
-
-  } else {
-    // Monday-start weeks, like the Realized P&L card. Each point is the
-    // value at the END of its week (clipped to today). The axis labels it
-    // with the week's Monday; the hover shows the trading days it covers
-    // (Mon – Fri, or Mon – today for the current week), so the newest point
-    // doesn't look older than it is.
-    const weekStarts = eachWeekOfInterval({ start, end: today }, { weekStartsOn: 1 })
-    labels   = weekStarts.map(ws => format(ws, 'MMM d'))
-    isoDates = weekStarts.map(ws => {
-      const we = endOfWeek(ws, { weekStartsOn: 1 })
-      return format(we > today ? today : we, 'yyyy-MM-dd')
-    })
-    hoverTitles = weekStarts.map(ws => {
-      const fri  = addDays(ws, 4)
-      const last = fri > today ? today : fri
-      return last <= ws ? format(ws, 'MMM d') : `${format(ws, 'MMM d')} – ${format(last, 'MMM d')}`
-    })
-  }
+  const dataDays = new Set(props.curve.map(p => p.date?.slice(0, 10)))
+  const days = eachDayOfInterval({ start, end: today })
+    .filter(d => !isWeekend(d) || dataDays.has(format(d, 'yyyy-MM-dd')))
+  const multiYear = differenceInCalendarDays(today, start) > 365
+  const labels      = days.map(d => format(d, multiYear ? 'MMM d, yy' : 'MMM d'))
+  const hoverTitles = days.map(d => format(d, multiYear ? 'EEE, MMM d, yyyy' : 'EEE, MMM d'))
+  const isoDates    = days.map(d => format(d, 'yyyy-MM-dd'))
 
   const labelStep = Math.max(1, Math.ceil(labels.length / 10))
 
-  let data = isoDates.map(iso => lastAtOrBefore(props.curve, iso, null))
-  // Fill nulls forward
-  let last = null
-  data = data.map(v => { if (v !== null) last = v; return last ?? 0 })
+  const data = valuesAt(props.curve, isoDates, 0)
 
   // Up/down (and thus the line color) is judged the same way Robinhood-style
   // charts do it: relative to the start of the selected range, not just
@@ -131,10 +109,8 @@ function buildChart() {
   const canShowPct = props.hasBalance
   let pctData = null
   if (canShowPct) {
-    let lastPnl = 0
-    const pnlBucket = isoDates.map(iso => { const v = lastAtOrBefore(props.pnlCurve, iso, null); if (v !== null) lastPnl = v; return lastPnl })
-    let lastBase = props.baseBalance
-    const baseBucket = isoDates.map(iso => { const v = lastAtOrBefore(props.fundBaseCurve, iso, null); if (v !== null) lastBase = v; return lastBase })
+    const pnlBucket  = valuesAt(props.pnlCurve, isoDates, 0)
+    const baseBucket = valuesAt(props.fundBaseCurve, isoDates, props.baseBalance)
     pctData = pnlBucket.map((pnl, i) => baseBucket[i] ? (pnl / baseBucket[i]) * 100 : null)
   }
 
@@ -171,7 +147,7 @@ function buildChart() {
           enabled: false,
           external: tooltipHandler,
           callbacks: {
-            title: items => hoverTitles ? hoverTitles[items[0].dataIndex] : items[0].label,
+            title: items => hoverTitles[items[0].dataIndex],
             label: ctx => {
               const dollar = ' $' + ctx.parsed.y.toFixed(2)
               const pct = pctData ? pctData[ctx.dataIndex] : null
