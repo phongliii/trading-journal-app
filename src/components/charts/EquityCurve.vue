@@ -89,14 +89,20 @@ function buildChart() {
     isoDates = months.map(m => format(endOfMonth(m) > today ? today : endOfMonth(m), 'yyyy-MM-dd'))
 
   } else {
-    // Monday-start weeks, like the Realized P&L card
+    // Monday-start weeks, like the Realized P&L card. Each point is the
+    // value at the END of its week (clipped to today), so it's labelled with
+    // that day — labelling it with the Monday made the current week's point
+    // read e.g. "Oct 12" even though it already included later days' trades.
     const weekStarts = eachWeekOfInterval({ start, end: today }, { weekStartsOn: 1 })
-    labels   = weekStarts.map(ws => format(ws, 'MMM d'))
-    isoDates = weekStarts.map(ws => {
+    const weekEnds   = weekStarts.map(ws => {
       const we = endOfWeek(ws, { weekStartsOn: 1 })
-      return format(we > today ? today : we, 'yyyy-MM-dd')
+      return we > today ? today : we
     })
+    labels   = weekEnds.map(we => format(we, 'MMM d'))
+    isoDates = weekEnds.map(we => format(we, 'yyyy-MM-dd'))
   }
+
+  const labelStep = Math.max(1, Math.ceil(labels.length / 10))
 
   let data = isoDates.map(iso => lastAtOrBefore(props.curve, iso, null))
   // Fill nulls forward
@@ -169,7 +175,13 @@ function buildChart() {
         }
       },
       scales: {
-        x: { grid: { display: false }, border: { display: false }, ticks: { color: '#5a7a9a', font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 10 } },
+        // Show at most ~10 labels, counted back from the LAST point so the
+        // newest date is always labelled (Chart.js's autoSkip counts from the
+        // first point and often hid it).
+        x: { grid: { display: false }, border: { display: false }, ticks: {
+          color: '#5a7a9a', font: { size: 10 }, maxRotation: 0, autoSkip: false,
+          callback: (_, i) => (labels.length - 1 - i) % labelStep === 0 ? labels[i] : '',
+        } },
         y: {
           suggestedMin: 0,
           border: { display: false },
