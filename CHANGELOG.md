@@ -28,10 +28,6 @@
   clicked day from the previous/next month isn't faded while its options show.
 
 ### Fixed
-- Dashboard charts (Equity / Balance, Realized P&L) stopped at the app's
-  "today", so trades dated later than that (e.g. the app set to a US timezone
-  while the broker stamps the next day) were cut off. They now run to the
-  latest trade.
 - **Rich-text notes:** pressing Enter with bold (or another style) active,
   or in an empty note, sent the cursor back to the start of the first line
   (and in an empty note dropped the new line).

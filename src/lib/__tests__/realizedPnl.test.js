@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildRealizedBuckets, rangeEnd, REALIZED_RANGES } from '../realizedPnl.js'
+import { buildRealizedBuckets, REALIZED_RANGES } from '../realizedPnl.js'
 
 const today = new Date(2026, 9, 7) // Wed Oct 7 2026
 
@@ -75,24 +75,5 @@ describe('buildRealizedBuckets', () => {
     expect(r.mode).toBe('weekly')
     expect(r.values.every(v => v === 0)).toBe(true)
     expect(r.total).toBe(0)
-  })
-
-  // The app's "today" comes from its timezone setting; a broker can stamp a
-  // trade a day later. That trade must still show, not be cut off.
-  it('runs to the latest trade when it is dated after today', () => {
-    const ahead = [...bars, { date: '2026-10-08', pnl: 99 }]
-    const r = buildRealizedBuckets(ahead, '1W', today)
-    expect(r.labels.at(-1)).toBe('Oct 8')
-    expect(r.values.at(-1)).toBe(99)
-    expect(r.labels).toHaveLength(7)
-  })
-})
-
-describe('rangeEnd', () => {
-  it('is today unless the last data point is later', () => {
-    expect(rangeEnd(today, null)).toBe(today)
-    expect(rangeEnd(today, new Date(2026, 9, 1))).toBe(today)
-    const later = new Date(2026, 9, 8)
-    expect(rangeEnd(today, later)).toBe(later)
   })
 })

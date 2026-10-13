@@ -16,15 +16,6 @@ export const REALIZED_RANGES = ['1W', '1M', '3M', 'YTD', 'ALL']
 const key = (d) => format(d, 'yyyy-MM-dd')
 const parseLocal = (ds) => { const [y, m, d] = ds.split('-').map(Number); return new Date(y, m - 1, d) }
 
-// Last day a range tab's chart runs to: today, or the latest data point if
-// that's later. "Today" comes from the app's timezone setting, while trade
-// timestamps are the broker's own — so a trade can be dated a day ahead of
-// the app's today (e.g. app set to a US timezone, broker stamping the next
-// day), and it must still show instead of being cut off as "the future".
-export function rangeEnd(today, lastDate) {
-  return lastDate && lastDate > today ? lastDate : today
-}
-
 // First day of a range tab's window. ALL starts at `firstDate` (the oldest
 // data point), or a year back when there's no data yet. Shared with the
 // Dashboard's Equity / Balance chart so both cards' tabs mean the same thing.
@@ -44,14 +35,13 @@ export function rangeMode(range, start, today) {
   return 'weekly'
 }
 
-export function buildRealizedBuckets(bars, range, appToday) {
+export function buildRealizedBuckets(bars, range, today) {
   const pnl = {}
   for (const b of bars) pnl[b.date] = b.pnl
   const sumDays = (from, to) =>
     eachDayOfInterval({ start: from, end: to }).reduce((s, d) => s + (pnl[key(d)] ?? 0), 0)
 
   const firstTrade = bars.length ? parseLocal(bars[0].date) : null
-  const today = rangeEnd(appToday, bars.length ? parseLocal(bars[bars.length - 1].date) : null)
   const start = rangeStart(range, today, firstTrade)
   const mode = rangeMode(range, start, today)
 

@@ -11,8 +11,8 @@
 import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue'
 import { Chart, LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
 import { format, parseISO, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval,
-         endOfWeek, startOfMonth, endOfMonth, startOfDay } from 'date-fns'
-import { rangeStart, rangeMode, rangeEnd } from '@/lib/realizedPnl'
+         endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
+import { rangeStart, rangeMode } from '@/lib/realizedPnl'
 import { createExternalTooltip } from '@/lib/chartTooltip'
 import { useTimezoneStore } from '@/stores/timezone'
 
@@ -69,9 +69,7 @@ function buildChart() {
   if (chart) { chart.destroy(); chart = null }
   if (!props.curve.length) return
 
-  // Runs to the latest point if it's dated after the app's today (see rangeEnd).
-  const lastDate = props.curve[props.curve.length - 1]?.date
-  const today = rangeEnd(tzStore.localDateObj(), lastDate ? startOfDay(parseISO(lastDate)) : null)
+  const today = tzStore.localDateObj()
   let labels, isoDates
 
   // Same windows and bucketing as the Realized P&L card's tabs.
