@@ -31,8 +31,8 @@
 - Equity / Balance chart: the newest date on the axis could be skipped, and on
   3M / YTD / ALL each point was a whole week, so it was unclear which days it
   covered. The chart now has one point per day on every tab (weekends skipped
-  unless something is dated on them), hovering shows that day, and the newest
-  date is always labelled.
+  unless something is dated on them), hovering shows that day, and the axis
+  is labelled with the first day of each week.
 - **Rich-text notes:** pressing Enter with bold (or another style) active,
   or in an empty note, sent the cursor back to the start of the first line
   (and in an empty note dropped the new line).

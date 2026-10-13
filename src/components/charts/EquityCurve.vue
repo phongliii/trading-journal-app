@@ -10,7 +10,7 @@
 <script setup>
 import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue'
 import { Chart, LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
-import { format, parseISO, eachDayOfInterval, isWeekend, differenceInCalendarDays } from 'date-fns'
+import { format, parseISO, eachDayOfInterval, isWeekend, isSameWeek, differenceInCalendarDays } from 'date-fns'
 import { rangeStart } from '@/lib/realizedPnl'
 import { createExternalTooltip } from '@/lib/chartTooltip'
 import { useTimezoneStore } from '@/stores/timezone'
@@ -89,7 +89,14 @@ function buildChart() {
   const hoverTitles = days.map(d => format(d, multiYear ? 'EEE, MMM d, yyyy' : 'EEE, MMM d'))
   const isoDates    = days.map(d => format(d, 'yyyy-MM-dd'))
 
-  const labelStep = Math.max(1, Math.ceil(labels.length / 10))
+  // Axis: label the first day of each week (normally its Monday), thinned
+  // to at most ~10 labels on long ranges. Hover still shows every day.
+  const weekFirsts = []
+  days.forEach((d, i) => {
+    if (i === 0 || !isSameWeek(d, days[i - 1], { weekStartsOn: 1 })) weekFirsts.push(i)
+  })
+  const weekStep = Math.max(1, Math.ceil(weekFirsts.length / 10))
+  const axisLabelAt = new Set(weekFirsts.filter((_, k) => k % weekStep === 0))
 
   const data = valuesAt(props.curve, isoDates, 0)
 
@@ -158,12 +165,10 @@ function buildChart() {
         }
       },
       scales: {
-        // Show at most ~10 labels, counted back from the LAST point so the
-        // newest date is always labelled (Chart.js's autoSkip counts from the
-        // first point and often hid it).
+        // Only the week-start days picked above (axisLabelAt) get a label.
         x: { grid: { display: false }, border: { display: false }, ticks: {
           color: '#5a7a9a', font: { size: 10 }, maxRotation: 0, autoSkip: false,
-          callback: (_, i) => (labels.length - 1 - i) % labelStep === 0 ? labels[i] : '',
+          callback: (_, i) => axisLabelAt.has(i) ? labels[i] : '',
         } },
         y: {
           suggestedMin: 0,
