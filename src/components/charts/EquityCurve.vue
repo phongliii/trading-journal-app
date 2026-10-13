@@ -11,7 +11,7 @@
 import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue'
 import { Chart, LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
 import { format, parseISO, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval,
-         endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
+         endOfWeek, startOfMonth, endOfMonth, addDays } from 'date-fns'
 import { rangeStart, rangeMode } from '@/lib/realizedPnl'
 import { createExternalTooltip } from '@/lib/chartTooltip'
 import { useTimezoneStore } from '@/stores/timezone'
@@ -71,6 +71,7 @@ function buildChart() {
 
   const today = tzStore.localDateObj()
   let labels, isoDates
+  let hoverTitles = null // tooltip titles when they differ from the axis labels
 
   // Same windows and bucketing as the Realized P&L card's tabs.
   const firstDate = props.curve[0]?.date ? parseISO(props.curve[0].date) : null
@@ -90,16 +91,21 @@ function buildChart() {
 
   } else {
     // Monday-start weeks, like the Realized P&L card. Each point is the
-    // value at the END of its week (clipped to today), so it's labelled with
-    // that day — labelling it with the Monday made the current week's point
-    // read e.g. "Oct 12" even though it already included later days' trades.
+    // value at the END of its week (clipped to today). The axis labels it
+    // with the week's Monday; the hover shows the trading days it covers
+    // (Mon – Fri, or Mon – today for the current week), so the newest point
+    // doesn't look older than it is.
     const weekStarts = eachWeekOfInterval({ start, end: today }, { weekStartsOn: 1 })
-    const weekEnds   = weekStarts.map(ws => {
+    labels   = weekStarts.map(ws => format(ws, 'MMM d'))
+    isoDates = weekStarts.map(ws => {
       const we = endOfWeek(ws, { weekStartsOn: 1 })
-      return we > today ? today : we
+      return format(we > today ? today : we, 'yyyy-MM-dd')
     })
-    labels   = weekEnds.map(we => format(we, 'MMM d'))
-    isoDates = weekEnds.map(we => format(we, 'yyyy-MM-dd'))
+    hoverTitles = weekStarts.map(ws => {
+      const fri  = addDays(ws, 4)
+      const last = fri > today ? today : fri
+      return last <= ws ? format(ws, 'MMM d') : `${format(ws, 'MMM d')} – ${format(last, 'MMM d')}`
+    })
   }
 
   const labelStep = Math.max(1, Math.ceil(labels.length / 10))
@@ -165,6 +171,7 @@ function buildChart() {
           enabled: false,
           external: tooltipHandler,
           callbacks: {
+            title: items => hoverTitles ? hoverTitles[items[0].dataIndex] : items[0].label,
             label: ctx => {
               const dollar = ' $' + ctx.parsed.y.toFixed(2)
               const pct = pctData ? pctData[ctx.dataIndex] : null

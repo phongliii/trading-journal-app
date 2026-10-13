@@ -28,11 +28,11 @@
   clicked day from the previous/next month isn't faded while its options show.
 
 ### Fixed
-- Equity / Balance chart: the last date on the axis could look a day or more
-  behind. Weekly points (3M / YTD / ALL) were labelled with the week's Monday
-  (e.g. "Oct 12" for a week that already included Oct 13), and the axis could
-  skip the newest label. Weekly points are now labelled with the last day
-  they cover, and the newest date is always shown.
+- Equity / Balance chart: the newest date on the axis could be skipped, and
+  weekly points (3M / YTD / ALL) didn't make clear which days they cover. The
+  newest label is always shown now; weekly points keep their Monday label on
+  the axis, and hovering shows the trading days covered (e.g. "Oct 5 – Oct 9",
+  or "Oct 12 – Oct 13" for the current week).
 - **Rich-text notes:** pressing Enter with bold (or another style) active,
   or in an empty note, sent the cursor back to the start of the first line
   (and in an empty note dropped the new line).
