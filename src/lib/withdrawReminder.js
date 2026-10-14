@@ -61,3 +61,24 @@ export function shouldRemindWithdraw({ today, isHoliday, threshold, balanceData,
   // Week is on: remind only while the balance is at/above the target.
   return computeCurrentBalance(balanceData, fundTransactions, trades) >= threshold
 }
+
+/**
+ * "Target reached" celebration: fires once when the balance goes from below
+ * the target to at/above it, and re-arms once it's back below.
+ *
+ * `saved` is the last recorded { amount, above } (null the first time). The
+ * first check — and any check after the target amount changes — only
+ * records where the balance stands, without celebrating, so turning the
+ * feature on (or editing the target) while already above it doesn't pop up.
+ *
+ * @returns {{ show: boolean, next: { amount: number, above: boolean } | null }}
+ */
+export function targetCrossing({ balance, threshold, saved }) {
+  if (!Number.isFinite(threshold) || threshold <= 0 || !Number.isFinite(balance)) {
+    return { show: false, next: saved ?? null }
+  }
+  const above = balance >= threshold
+  const next = { amount: threshold, above }
+  if (!saved || saved.amount !== threshold) return { show: false, next }
+  return { show: above && !saved.above, next }
+}

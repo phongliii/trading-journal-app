@@ -56,6 +56,7 @@
 
     <ToastStack />
     <ConfirmModal />
+    <TargetReachedModal :target="targetReached" @close="targetReached = null" />
   </div>
 </template>
 
@@ -66,7 +67,7 @@ import { prefetchLoginView } from '@/router'
 import { format } from 'date-fns'
 import { useTradesStore } from '@/stores/trades'
 import { useBalanceStore } from '@/stores/balance'
-import { shouldRemindWithdraw } from '@/lib/withdrawReminder'
+import { shouldRemindWithdraw, targetCrossing } from '@/lib/withdrawReminder'
 import { useCashEventsStore } from '@/stores/cashEvents'
 import { useTimezoneStore } from '@/stores/timezone'
 import { useHolidayStore } from '@/stores/holidays'
@@ -86,6 +87,7 @@ import AppSidebar   from '@/components/layout/AppSidebar.vue'
 import AppTopbar    from '@/components/layout/AppTopbar.vue'
 import ToastStack   from '@/components/ui/ToastStack.vue'
 import ConfirmModal from '@/components/ui/ConfirmModal.vue'
+import TargetReachedModal from '@/components/ui/TargetReachedModal.vue'
 import AppShellSkeleton from '@/components/layout/AppShellSkeleton.vue'
 
 const route = useRoute()
@@ -144,6 +146,27 @@ function checkWithdrawReminder() {
   toast.warn(`Balance is $${amountStr} — consider withdrawing.`)
   withdrawReminderStore.markShown(format(today, 'yyyy-MM-dd'))
 }
+
+// "Target reached" celebration: shown once when the balance crosses from
+// below the withdraw target to at/above it (lib/withdrawReminder.js's
+// targetCrossing). Checked on load and whenever the balance changes after
+// that (e.g. right after an import).
+const targetReached = ref(null) // { balance, amount } while the modal is open
+let switchingPortfolio = false // see the activeAccountId watch below
+function checkTargetReached() {
+  if (!withdrawReminderStore.enabled) return
+  // Mid-reload the balance can be a mix of old and new data — skip.
+  if (switchingPortfolio || tradesStore.loading || balanceStore.loading) return
+  const portfolioId = accountsStore.activeAccountId
+  if (!portfolioId) return
+  const threshold = Number(withdrawReminderStore.amount)
+  const balance = balanceStore.currentBalance
+  const saved = withdrawReminderStore.targetStates[portfolioId] ?? null
+  const { show, next } = targetCrossing({ balance, threshold, saved })
+  if (JSON.stringify(next) !== JSON.stringify(saved)) withdrawReminderStore.setTargetState(portfolioId, next)
+  if (show) targetReached.value = { balance, amount: threshold }
+}
+let targetWatchStarted = false
 
 // Warm the (lazy-loaded) Login page's chunk in the background once the
 // browser is idle, so it's normally already cached by the time someone
@@ -229,6 +252,16 @@ async function loadCloudDataSequence() {
   // already been chosen.
   imageStorageStore.restore()
   checkWithdrawReminder()
+  checkTargetReached()
+  // Only start watching once everything has loaded (and only once — this
+  // sequence can run again on a later sign-in), so the empty initial state
+  // never counts as "below the target".
+  if (!targetWatchStarted) {
+    targetWatchStarted = true
+    // The loading flags are watched too, so a change that lands mid-load is
+    // re-checked once the load finishes.
+    watch(() => [balanceStore.currentBalance, withdrawReminderStore.amount, tradesStore.loading, balanceStore.loading], checkTargetReached)
+  }
 
   // One-time pull/reconcile of the small "settings blob" stores against
   // Supabase (see lib/cloudSettings.js).
@@ -282,13 +315,19 @@ watch(() => accountsStore.activeAccountId, async (id, prevId) => {
   // immediately-following page navigation to redundantly reload the same
   // data this switch is already fetching.
   markCloudRefreshed(ALL_CLOUD_STORES)
-  await Promise.all([
-    tradesStore.load(),
-    balanceStore.load(),
-    cashEventsStore.load(),
-    journalStore.load(),
-    rawCsvArchiveStore.load(),
-  ])
+  switchingPortfolio = true
+  try {
+    await Promise.all([
+      tradesStore.load(),
+      balanceStore.load(),
+      cashEventsStore.load(),
+      journalStore.load(),
+      rawCsvArchiveStore.load(),
+    ])
+  } finally {
+    switchingPortfolio = false
+  }
+  checkTargetReached()
 })
 
 // Everything above only ever loads from the cloud ONCE, right after
