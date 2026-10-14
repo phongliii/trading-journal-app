@@ -5,8 +5,8 @@
 ### Changed
 - **Withdraw reminder** is now decided once a week, on the first trading day:
   if the balance going into that day is at or above the target, it reminds
-  every trading day that week until a withdrawal is imported or the balance
-  drops below the target (then not again until next week); if it's below,
+  every trading day that week the balance is still at or above it, until a
+  withdrawal is imported; if it's below,
   there's no reminder that week, even if the target is hit mid-week.
   Previously it reminded on any trading day the balance was over the target.
 - **Removed the top bar's period picker** (30d / 60d / 90d / 1Y / All). It

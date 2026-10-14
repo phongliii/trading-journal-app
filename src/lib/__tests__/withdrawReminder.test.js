@@ -51,14 +51,14 @@ describe('shouldRemindWithdraw', () => {
     expect(shouldRemindWithdraw({ ...base, today: day(13), trades: smallLoss })).toBe(true)
   })
 
-  it('stops once the balance drops below the target', () => {
+  it('pauses while the balance is below the target', () => {
     const bigLoss = [...atTargetBeforeMonday, trade(-2000, '2026-10-12')] // 8500 now
     expect(shouldRemindWithdraw({ ...base, today: day(13), trades: bigLoss })).toBe(false)
   })
 
-  it('stays off for the week after dropping below, even if the balance climbs back', () => {
+  it('resumes when the balance is back above the target in a week that started on', () => {
     const dipTuesday = [...atTargetBeforeMonday, trade(-1000, '2026-10-13'), trade(1500, '2026-10-14')]
-    expect(shouldRemindWithdraw({ ...base, today: day(15), trades: dipTuesday })).toBe(false)
+    expect(shouldRemindWithdraw({ ...base, today: day(15), trades: dipTuesday })).toBe(true)
   })
 
   it('does not restart mid-week if the balance climbs back above the target', () => {
