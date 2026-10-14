@@ -368,6 +368,17 @@ describe('drawdownSummary', () => {
     expect(r.currentDrawdownPct).toBeCloseTo(4)
   })
 
+  it('only measures from the window start when given one', () => {
+    const events = [
+      ev('2026-01-02T10:00:00', -400),  // before the window: ignored for drawdown
+      ev('2026-01-05T10:00:00', 100),
+      ev('2026-01-06T10:00:00', -60),
+    ]
+    const r = drawdownSummary({ events, trades: [], fundTransactions: [], baseBalance: 1000, from: '2026-01-05' })
+    expect(r).toMatchObject({ maxDrawdown: 60, currentDrawdown: 60 })
+    expect(r.maxDrawdownPct).toBeCloseTo(8.57) // 60 / (1000 - 400 + 100)
+  })
+
   it('handles no data', () => {
     expect(drawdownSummary({ events: [], trades: [], fundTransactions: [], baseBalance: null }))
       .toEqual({ maxDrawdown: 0, maxDrawdownPct: null, currentDrawdown: 0, currentDrawdownPct: null, source: 'trades' })

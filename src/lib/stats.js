@@ -568,7 +568,8 @@ export function computeSideBias(trades) {
 }
 
 /**
- * All-time drawdown summary for the Dashboard's Max Drawdown card.
+ * Drawdown summary for the Dashboard's Max Drawdown card (all time, or from
+ * `from` on — the card follows the Equity / Balance chart's range tab).
  *
  * Uses the raw cash events (fills, fees, fund transactions) when there are
  * any; otherwise falls back to trades (each trade's net P&L at its close
@@ -584,9 +585,11 @@ export function computeSideBias(trades) {
  * @param {Array}  o.trades           [{ sold_at, pnl }]
  * @param {Array}  o.fundTransactions [{ date, amount }]
  * @param {number|null} o.baseBalance account value before the first event, or null
+ * @param {string|null} [o.from]      'yyyy-MM-dd' — only measure from this day on
+ *   (the peak starts at the account's level going into it); null = all time
  * @returns {{ maxDrawdown, maxDrawdownPct, currentDrawdown, currentDrawdownPct, source }}
  */
-export function drawdownSummary({ events, trades, fundTransactions, baseBalance }) {
+export function drawdownSummary({ events, trades, fundTransactions, baseBalance, from = null }) {
   let source = 'cash'
   let list = events || []
   if (!list.length) {
@@ -604,6 +607,8 @@ export function drawdownSummary({ events, trades, fundTransactions, baseBalance 
   let maxDD = 0, maxDDPct = 0
   for (const e of sorted) {
     account += e.delta
+    // Before the window: only moves the account value the window starts from.
+    if (from && e.timestamp.slice(0, 10) < from) { accountAtPeak = account; continue }
     if (e.type === 'Fund Transaction') {
       // Moving money in/out shifts the account value but isn't P&L; keep the
       // peak's account value in step so % stays relative to real capital.
