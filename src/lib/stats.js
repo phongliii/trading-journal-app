@@ -566,3 +566,65 @@ export function computeSideBias(trades) {
 
   return { long: summarize(long), short: summarize(short) }
 }
+
+/**
+ * All-time drawdown summary for the Dashboard's Max Drawdown card.
+ *
+ * Uses the raw cash events (fills, fees, fund transactions) when there are
+ * any; otherwise falls back to trades (each trade's net P&L at its close
+ * time) plus fund transactions, so the card isn't stuck at $0 when no Cash
+ * History has been imported. Deposits/withdrawals never count as drawdown.
+ *
+ * Percentages are of the ACCOUNT value at the peak the drop is measured
+ * from (baseBalance + everything up to that point), so they're only given
+ * when a starting balance is set (`baseBalance` not null).
+ *
+ * @param {object} o
+ * @param {Array}  o.events           [{ timestamp, type, delta }] cash events
+ * @param {Array}  o.trades           [{ sold_at, pnl }]
+ * @param {Array}  o.fundTransactions [{ date, amount }]
+ * @param {number|null} o.baseBalance account value before the first event, or null
+ * @returns {{ maxDrawdown, maxDrawdownPct, currentDrawdown, currentDrawdownPct, source }}
+ */
+export function drawdownSummary({ events, trades, fundTransactions, baseBalance }) {
+  let source = 'cash'
+  let list = events || []
+  if (!list.length) {
+    source = 'trades'
+    list = [
+      ...(trades || []).filter(t => t.sold_at).map(t => ({ timestamp: t.sold_at, type: 'Trade', delta: t.pnl })),
+      ...(fundTransactions || []).filter(f => f.date).map(f => ({ timestamp: f.date, type: 'Fund Transaction', delta: f.amount })),
+    ]
+  }
+  const sorted = [...list].sort((a, b) => a.timestamp.localeCompare(b.timestamp))
+  const withPct = baseBalance !== null && baseBalance !== undefined
+
+  let pnl = 0, account = withPct ? baseBalance : 0
+  let peak = 0, accountAtPeak = account
+  let maxDD = 0, maxDDPct = 0
+  for (const e of sorted) {
+    account += e.delta
+    if (e.type === 'Fund Transaction') {
+      // Moving money in/out shifts the account value but isn't P&L; keep the
+      // peak's account value in step so % stays relative to real capital.
+      if (pnl >= peak) accountAtPeak = account
+      continue
+    }
+    pnl += e.delta
+    if (pnl >= peak) { peak = pnl; accountAtPeak = account }
+    const dd = peak - pnl
+    if (dd > maxDD) {
+      maxDD = dd
+      maxDDPct = withPct && accountAtPeak > 0 ? (dd / accountAtPeak) * 100 : 0
+    }
+  }
+  const current = peak - pnl
+  const r2 = (v) => Math.round(v * 100) / 100
+  return {
+    maxDrawdown: r2(maxDD),
+    maxDrawdownPct: withPct ? r2(maxDDPct) : null,
+    currentDrawdown: r2(current),
+    currentDrawdownPct: withPct && accountAtPeak > 0 ? r2((current / accountAtPeak) * 100) : null,
+    source,
+  }
+}

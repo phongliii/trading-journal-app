@@ -62,9 +62,10 @@
         tooltip="Ratio of total profits to total losses." />
 
       <StatCard label="Max Drawdown"
-        :raw-value="allTimeDrawdown.maxDrawdown"
+        :raw-value="drawdown.maxDrawdown"
         value-class="text-down"
-        tooltip="Maximum peak-to-trough equity decline, computed from realized cash flow including fees at time of charge." />
+        :sub="drawdownSub"
+        :tooltip="drawdownTooltip" />
     </section>
 
     <!-- Daily P&L + Equity Curve -->
@@ -192,7 +193,7 @@ import { useBalanceStore } from '@/stores/balance'
 import { useCashEventsStore } from '@/stores/cashEvents'
 import { useTimezoneStore } from '@/stores/timezone'
 import { format } from 'date-fns'
-import { fmt, fmtPct, computeStats, computeDrawdownFromEvents, computeBalanceCurve, computeFundBaseCurve, groupByMonth, groupByDow, resolvePeriodRange, filterTradesByDateRange, filterTradesByMonth } from '@/lib/stats'
+import { fmt, fmtPct, computeStats, drawdownSummary, computeBalanceCurve, computeFundBaseCurve, groupByMonth, groupByDow, resolvePeriodRange, filterTradesByDateRange, filterTradesByMonth } from '@/lib/stats'
 import StatCard      from '@/components/ui/StatCard.vue'
 import PnlModeTabs   from '@/components/ui/PnlModeTabs.vue'
 import EquityModeTabs from '@/components/ui/EquityModeTabs.vue'
@@ -277,8 +278,27 @@ const totalGrossPnl = computed(() =>
   Math.round(tradesStore.trades.reduce((s, t) => s + (t.gross_pnl ?? t.pnl), 0) * 100) / 100
 )
 
-// Max Drawdown / Peak Equity using raw chronological cash events, all time
-const allTimeDrawdown = computed(() => computeDrawdownFromEvents(cashEventsStore.events, null, null))
+// Max Drawdown card: all-time max drawdown, plus how far below the peak the
+// account is right now — see drawdownSummary in lib/stats.js.
+const drawdown = computed(() => drawdownSummary({
+  events: cashEventsStore.events,
+  trades: tradesStore.trades,
+  fundTransactions: balanceStore.fundTransactions,
+  baseBalance: balanceStore.hasBalance ? balanceStore.correctStarting : null,
+}))
+const drawdownSub = computed(() => {
+  const d = drawdown.value
+  const pct = (v) => (v === null ? '' : ` (${fmtPct(v)})`)
+  const max = d.maxDrawdownPct !== null && d.maxDrawdown > 0 ? `${fmtPct(d.maxDrawdownPct)} of peak · ` : ''
+  const now = d.currentDrawdown > 0 ? `Now -${fmt(d.currentDrawdown)}${pct(d.currentDrawdownPct)}` : 'Now at peak'
+  return max + now
+})
+const drawdownTooltip = computed(() =>
+  'Largest peak-to-trough drop in realized P&L, all time (deposits and withdrawals don\'t count). ' +
+  '"Now" is how far below that peak you are today. ' +
+  (drawdown.value.source === 'cash'
+    ? 'From Cash History, including fees when charged.'
+    : 'From trades (no Cash History imported), using each trade\'s net P&L.'))
 
 const winLossRatio = computed(() => {
   if (!stats.value.avgLoss || !stats.value.avgWin) return '—'
