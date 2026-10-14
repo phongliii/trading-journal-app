@@ -180,6 +180,8 @@
                     <th>Exit</th>
                     <th>P&L</th>
                     <th>Result</th>
+                    <th>Time</th>
+                    <th>Duration</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -198,6 +200,11 @@
                       <span v-else-if="(t.gross_pnl ?? t.pnl) < 0" class="badge-down">Loss</span>
                       <span v-else class="badge-neutral">Breakeven</span>
                     </td>
+                    <!-- Same as the Trades page; weekly/monthly tables mix days, so add the date there -->
+                    <td class="text-ink-faint text-xs whitespace-nowrap font-mono">
+                      <template v-if="selected.type !== 'daily'">{{ fmtTradeDay(t.sold_at) }} · </template>{{ fmtTradeTime(t.bought_at) }} <span class="text-ink-faint/50">→</span> {{ fmtTradeTime(t.sold_at) }}
+                    </td>
+                    <td class="text-ink-faint text-xs whitespace-nowrap">{{ t.duration || '—' }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -539,6 +546,8 @@ const yearModalPage = ref(0)
 const page           = ref(0)
 const tradePage      = ref(0)
 const selectedTrade  = ref(null)
+const fmtTradeTime = (iso) => { if (!iso) return '—'; try { return format(parseISO(iso), 'HH:mm') } catch { return iso } }
+const fmtTradeDay  = (iso) => { if (!iso) return '—'; try { return format(parseISO(iso), 'MMM d') } catch { return iso } }
 // The table's rows come from `selected.value.trades`, a snapshot the
 // trades watch above deliberately leaves alone for notes/tags/strategy/
 // chartImage-only edits. Passing that snapshot straight to TradeDrawer
