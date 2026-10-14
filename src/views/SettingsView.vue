@@ -52,7 +52,7 @@
             v-model="withdrawAmount"
             @keydown.enter="$event.target.blur()" />
         </div>
-        <p class="text-2xs text-ink-faint mt-2">Checked on the first trading day of each week: if your balance going into that day is at or above this amount, you're reminded every trading day that week until a withdrawal is imported from a Cash History file. If it's below, there's no reminder that week, even if you reach the amount mid-week.</p>
+        <p class="text-2xs text-ink-faint mt-2">Checked on the first trading day of each week: if your balance going into that day is at or above this amount, you're reminded every trading day that week until a withdrawal is imported from a Cash History file or your balance drops below this amount (then not again until next week). If it's below, there's no reminder that week, even if you reach the amount mid-week.</p>
       </div>
     </div>
 

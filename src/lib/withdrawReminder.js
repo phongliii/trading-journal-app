@@ -3,7 +3,9 @@
 // The week is decided on its FIRST TRADING DAY (Monday, or the next weekday
 // that isn't a holiday): if the balance going into that day is at/above the
 // target, the week is "on" and the toast shows once per trading day until a
-// withdrawal dated this week is recorded. If it's below, the week is "off" —
+// withdrawal dated this week is recorded or the balance drops below the
+// target (which ends it for the rest of the week, even if the balance
+// climbs back). If it's below, the week is "off" —
 // no toast at all that week, even if the target is hit mid-week. Each week
 // starts over.
 import { format, startOfWeek, endOfWeek, addDays } from 'date-fns'
@@ -54,5 +56,18 @@ export function shouldRemindWithdraw({ today, isHoliday, threshold, balanceData,
     fundTransactions.filter(t => t.date < firstStr),
     trades.filter(t => !t.sold_at || t.sold_at.slice(0, 10) < firstStr),
   )
-  return balanceAtStart >= threshold
+  if (balanceAtStart < threshold) return false
+
+  // Once the week is on, it ends for the week as soon as the balance has
+  // been below the target at the end of any day from the first trading day
+  // through today.
+  const balanceThrough = (dayStr) => computeCurrentBalance(
+    balanceData,
+    fundTransactions.filter(t => t.date <= dayStr),
+    trades.filter(t => !t.sold_at || t.sold_at.slice(0, 10) <= dayStr),
+  )
+  for (let d = first; d <= today; d = addDays(d, 1)) {
+    if (balanceThrough(ymd(d)) < threshold) return false
+  }
+  return true
 }

@@ -124,7 +124,8 @@ const toast          = useToast()
 
 // Withdraw reminder — the rule lives in lib/withdrawReminder.js: the week
 // is decided on its first trading day (balance going into that day at/above
-// the target → toast once per trading day until a withdrawal this week;
+// the target → toast once per trading day until a withdrawal this week or
+// the balance drops below the target;
 // below → no toast all week, even if the target is hit mid-week).
 function checkWithdrawReminder() {
   if (!withdrawReminderStore.enabled) return

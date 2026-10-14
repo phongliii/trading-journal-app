@@ -46,9 +46,25 @@ describe('shouldRemindWithdraw', () => {
   })
 
   it('goes by the balance going into Monday, whichever day the app is opened', () => {
-    // At target going into Monday, then a loss on Monday — the week is still "on".
-    const lossOnMonday = [...atTargetBeforeMonday, trade(-2000, '2026-10-12')]
-    expect(shouldRemindWithdraw({ ...base, today: day(13), trades: lossOnMonday })).toBe(true)
+    // At target going into Monday, a small loss Monday that stays above it — still "on".
+    const smallLoss = [...atTargetBeforeMonday, trade(-200, '2026-10-12')]
+    expect(shouldRemindWithdraw({ ...base, today: day(13), trades: smallLoss })).toBe(true)
+  })
+
+  it('stops once the balance drops below the target', () => {
+    const bigLoss = [...atTargetBeforeMonday, trade(-2000, '2026-10-12')] // 8500 now
+    expect(shouldRemindWithdraw({ ...base, today: day(13), trades: bigLoss })).toBe(false)
+  })
+
+  it('stays off for the week after dropping below, even if the balance climbs back', () => {
+    const dipTuesday = [...atTargetBeforeMonday, trade(-1000, '2026-10-13'), trade(1500, '2026-10-14')]
+    expect(shouldRemindWithdraw({ ...base, today: day(15), trades: dipTuesday })).toBe(false)
+  })
+
+  it('does not restart mid-week if the balance climbs back above the target', () => {
+    // Week was "off" (below on Monday); back above by Thursday — still nothing.
+    const below = [trade(500, '2026-10-09'), trade(2000, '2026-10-14')]
+    expect(shouldRemindWithdraw({ ...base, today: day(15), trades: below })).toBe(false)
   })
 
   it('shows at most once per day', () => {
