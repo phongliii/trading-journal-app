@@ -64,7 +64,7 @@
       <StatCard :label="`Max Drawdown · ${equityRange}`"
         :raw-value="drawdown.maxDrawdown"
         value-class="text-down"
-        :sub="drawdownSub"
+        :suffix="drawdownPct"
         :tooltip="drawdownTooltip" />
     </section>
 
@@ -288,14 +288,15 @@ const drawdown = computed(() => drawdownSummary({
   baseBalance: balanceStore.hasBalance ? balanceStore.correctStarting : null,
   from: equityRangeFrom.value,
 }))
-// "% of peak" only when a starting balance makes it meaningful.
-const drawdownSub = computed(() => {
+// "(x%)" of the account at the peak, next to the $ value — only when a
+// starting balance makes it meaningful.
+const drawdownPct = computed(() => {
   const d = drawdown.value
-  return d.maxDrawdownPct !== null && d.maxDrawdown > 0 ? `${fmtPct(d.maxDrawdownPct)} of peak` : ''
+  return d.maxDrawdownPct !== null && d.maxDrawdown > 0 ? `(${fmtPct(d.maxDrawdownPct)})` : ''
 })
 const drawdownTooltip = computed(() =>
   'Largest peak-to-trough drop in realized P&L over the range selected on the Equity / Balance chart ' +
-  '(deposits and withdrawals don\'t count). ' +
+  '(deposits and withdrawals don\'t count). The % is of your account value at that peak. ' +
   (drawdown.value.source === 'cash'
     ? 'From Cash History, including fees when charged.'
     : 'From trades (no Cash History imported), using each trade\'s net P&L.'))

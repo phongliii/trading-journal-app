@@ -6,7 +6,7 @@
 - Dashboard **Max Drawdown** card follows the Equity / Balance chart's range
   tab (1W / 1M / 3M / YTD / ALL) instead of always being all-time; with a
   starting balance set it also shows the drop as a % of the account at the
-  peak. Without Cash History it falls back to trades instead of showing $0.
+  peak, in parentheses next to the amount, e.g. "$282.00 (6.1%)". Without Cash History it falls back to trades instead of showing $0.
 - Sidebar: the storage label now reads "Synced to cloud" instead of "Local
   storage" (data has lived in Supabase for a while).
 - Settings → Withdraw reminder: clearer explanation, including that the
