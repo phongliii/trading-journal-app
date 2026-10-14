@@ -55,7 +55,7 @@
       </RouterLink>
       <div class="px-2 py-1 text-2xs text-ink-faint flex items-center gap-1.5">
         <span class="w-1.5 h-1.5 rounded-full bg-brand"></span>
-        Local storage
+        Synced to cloud
       </div>
     </div>
 
