@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Changed
+- Sidebar: the storage label now reads "Synced to cloud" instead of "Local
+  storage" (data has lived in Supabase for a while).
+- Settings → Withdraw reminder: clearer explanation, including that the
+  withdrawal must be dated that week and the "Target reached" message.
 - **Withdraw reminder** is now decided once a week, on the first trading day:
   if the balance going into that day is at or above the target, it reminds
   every trading day that week the balance is still at or above it, until a
