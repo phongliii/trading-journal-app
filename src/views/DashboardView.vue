@@ -61,10 +61,10 @@
         :value-class="stats.profitFactor >= 1 ? 'text-up' : 'text-down'"
         tooltip="Ratio of total profits to total losses." />
 
-      <StatCard label="Max Drawdown"
+      <StatCard :label="`Max Drawdown · ${equityRange}`"
         :raw-value="drawdown.maxDrawdown"
         value-class="text-down"
-        :sub="drawdownSub"
+        :suffix="drawdownPct"
         :tooltip="drawdownTooltip" />
     </section>
 
@@ -278,24 +278,25 @@ const totalGrossPnl = computed(() =>
   Math.round(tradesStore.trades.reduce((s, t) => s + (t.gross_pnl ?? t.pnl), 0) * 100) / 100
 )
 
-// Max Drawdown card: all-time max drawdown, plus how far below the peak the
-// account is right now — see drawdownSummary in lib/stats.js.
+// Max Drawdown card: follows the Equity / Balance chart's range tab (same
+// window), so it reflects the period you're looking at rather than your
+// worst drop ever — see drawdownSummary in lib/stats.js.
 const drawdown = computed(() => drawdownSummary({
   events: cashEventsStore.events,
   trades: tradesStore.trades,
   fundTransactions: balanceStore.fundTransactions,
   baseBalance: balanceStore.hasBalance ? balanceStore.correctStarting : null,
+  from: equityRangeFrom.value,
 }))
-const drawdownSub = computed(() => {
+// "(x%)" of the account at the peak, next to the $ value — only when a
+// starting balance makes it meaningful.
+const drawdownPct = computed(() => {
   const d = drawdown.value
-  const pct = (v) => (v === null ? '' : ` (${fmtPct(v)})`)
-  const max = d.maxDrawdownPct !== null && d.maxDrawdown > 0 ? `${fmtPct(d.maxDrawdownPct)} of peak · ` : ''
-  const now = d.currentDrawdown > 0 ? `Now -${fmt(d.currentDrawdown)}${pct(d.currentDrawdownPct)}` : 'Now at peak'
-  return max + now
+  return d.maxDrawdownPct !== null && d.maxDrawdown > 0 ? `(${fmtPct(d.maxDrawdownPct)})` : ''
 })
 const drawdownTooltip = computed(() =>
-  'Largest peak-to-trough drop in realized P&L, all time (deposits and withdrawals don\'t count). ' +
-  '"Now" is how far below that peak you are today. ' +
+  'Largest peak-to-trough drop in realized P&L over the range selected on the Equity / Balance chart ' +
+  '(deposits and withdrawals don\'t count). The % is of your account value at that peak. ' +
   (drawdown.value.source === 'cash'
     ? 'From Cash History, including fees when charged.'
     : 'From trades (no Cash History imported), using each trade\'s net P&L.'))
