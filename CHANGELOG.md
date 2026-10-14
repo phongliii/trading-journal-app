@@ -21,6 +21,8 @@
 - The unused Analytics page (it had no route or menu link).
 
 ### Added
+- Journal: the day's trade table has **Time** (open → close) and **Duration**
+  columns, like the Trades page. Weekly and monthly tables also show the date.
 - **"Target reached!" pop-up** when the Account Balance crosses from below the
   withdraw target to at or above it (checked on load and right after an
   import). Shows once per crossing, per portfolio; it re-arms after the
