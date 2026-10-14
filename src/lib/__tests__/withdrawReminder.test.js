@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { shouldRemindWithdraw, firstTradingDayOfWeek } from '../withdrawReminder.js'
+import { shouldRemindWithdraw, firstTradingDayOfWeek, targetCrossing } from '../withdrawReminder.js'
 
 // Week of Mon Oct 12 – Sun Oct 18, 2026
 const day = (d) => new Date(2026, 9, d)
@@ -87,5 +87,37 @@ describe('shouldRemindWithdraw', () => {
   it('does nothing without a valid target', () => {
     expect(shouldRemindWithdraw({ ...base, threshold: 0, today: day(12), trades: atTargetBeforeMonday })).toBe(false)
     expect(shouldRemindWithdraw({ ...base, threshold: NaN, today: day(12), trades: atTargetBeforeMonday })).toBe(false)
+  })
+})
+
+describe('targetCrossing', () => {
+  it('only records the state on the first check (no pop-up)', () => {
+    expect(targetCrossing({ balance: 12000, threshold: 10000, saved: null }))
+      .toEqual({ show: false, next: { amount: 10000, above: true } })
+  })
+
+  it('celebrates when the balance crosses from below to at/above the target', () => {
+    expect(targetCrossing({ balance: 10000, threshold: 10000, saved: { amount: 10000, above: false } }))
+      .toEqual({ show: true, next: { amount: 10000, above: true } })
+  })
+
+  it('does not repeat while the balance stays above', () => {
+    expect(targetCrossing({ balance: 11000, threshold: 10000, saved: { amount: 10000, above: true } }).show).toBe(false)
+  })
+
+  it('re-arms after dropping below, then celebrates the next crossing', () => {
+    const dropped = targetCrossing({ balance: 9000, threshold: 10000, saved: { amount: 10000, above: true } })
+    expect(dropped).toEqual({ show: false, next: { amount: 10000, above: false } })
+    expect(targetCrossing({ balance: 10500, threshold: 10000, saved: dropped.next }).show).toBe(true)
+  })
+
+  it('changing the target only re-records the state', () => {
+    expect(targetCrossing({ balance: 12000, threshold: 11000, saved: { amount: 10000, above: false } }))
+      .toEqual({ show: false, next: { amount: 11000, above: true } })
+  })
+
+  it('ignores an invalid target', () => {
+    const saved = { amount: 10000, above: false }
+    expect(targetCrossing({ balance: 12000, threshold: 0, saved })).toEqual({ show: false, next: saved })
   })
 })

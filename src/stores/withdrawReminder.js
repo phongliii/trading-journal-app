@@ -12,19 +12,25 @@ function load() {
 // - enabled/amount: the user's settings.
 // - lastShownDate: last date the toast actually fired, so a reload/revisit
 //   the same day doesn't show it again.
+// - targetStates: { [portfolioId]: { amount, above } } as of the last
+//   "Target reached" check (lib/withdrawReminder.js's targetCrossing), per
+//   device. Per portfolio, so switching portfolios never looks like a
+//   crossing.
 // When it fires is decided by lib/withdrawReminder.js (see App.vue).
 export const useWithdrawReminderStore = defineStore('withdrawReminder', () => {
-  const saved = load() || { enabled: false, amount: null, lastShownDate: null }
+  const saved = load() || { enabled: false, amount: null, lastShownDate: null, targetStates: {} }
 
   const enabled       = ref(saved.enabled)
   const amount        = ref(saved.amount)
   const lastShownDate = ref(saved.lastShownDate)
+  const targetStates  = ref(saved.targetStates ?? {})
 
   function save() {
     localStorage.setItem(KEY, JSON.stringify({
       enabled: enabled.value,
       amount: amount.value,
       lastShownDate: lastShownDate.value,
+      targetStates: targetStates.value,
     }))
   }
 
@@ -38,6 +44,7 @@ export const useWithdrawReminderStore = defineStore('withdrawReminder', () => {
   function setEnabled(v) { enabled.value = v; save(); pushCloud() }
   function setAmount(v)  { amount.value = v; save(); pushCloud() }
   function markShown(dateStr) { lastShownDate.value = dateStr; save() }
+  function setTargetState(portfolioId, v) { targetStates.value = { ...targetStates.value, [portfolioId]: v }; save() }
 
   // lib/cloudSettings.js's sync-on-load calls these by name.
   function applyFromCloud(val) {
@@ -48,8 +55,8 @@ export const useWithdrawReminderStore = defineStore('withdrawReminder', () => {
   function toCloudValue() { return { enabled: enabled.value, amount: amount.value } }
 
   return {
-    enabled, amount, lastShownDate,
-    setEnabled, setAmount, markShown,
+    enabled, amount, lastShownDate, targetStates,
+    setEnabled, setAmount, markShown, setTargetState,
     applyFromCloud, toCloudValue,
   }
 })

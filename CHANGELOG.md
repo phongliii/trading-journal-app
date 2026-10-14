@@ -21,6 +21,10 @@
 - The unused Analytics page (it had no route or menu link).
 
 ### Added
+- **"Target reached!" pop-up** when the Account Balance crosses from below the
+  withdraw target to at or above it (checked on load and right after an
+  import). Shows once per crossing, per portfolio; it re-arms after the
+  balance drops below the target. Needs the withdraw reminder turned on.
 - Journal: **No-trade day** toggle in the daily check-in. Marked days show a
   "No-trade day" badge on the check-in card instead of the questions, and no
   longer re-prompt for them. The questions are hidden in the check-in while
