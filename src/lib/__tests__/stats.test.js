@@ -4,7 +4,7 @@ import {
   resolvePeriodRange, filterTradesByMonth, filterTradesByDateRange,
   fmt, fmtCompact, fmtPct,
   computeDrawdownFromEvents, computeBalanceCurve, computeFundBaseCurve,
-  computeRevengeTrading, computeOvertrading, computeHourlyPerf, computeSideBias,
+  computeRevengeTrading, computeOvertrading, computeHourlyPerf, computeSideBias, drawdownSummary,
 } from '../stats.js'
 
 const trade = (pnl, sold_at, extra = {}) => ({ symbol: 'MNQ', pnl, sold_at, ...extra })
@@ -335,5 +335,41 @@ describe('behaviour analytics', () => {
       long: { count: 2, winRate: 50, pnl: 5 },
       short: { count: 1, winRate: 100, pnl: 7 },
     })
+  })
+})
+
+describe('drawdownSummary', () => {
+  const ev = (timestamp, delta, type = 'Trade Paired') => ({ timestamp, delta, type })
+
+  it('reports max and current drawdown from cash events, ignoring fund moves', () => {
+    const events = [
+      ev('2026-01-05T09:00:00', 1000, 'Fund Transaction'),
+      ev('2026-01-05T10:00:00', 200),   // pnl 200 (peak), account 1200
+      ev('2026-01-05T11:00:00', -150),  // dd 150
+      ev('2026-01-05T12:00:00', -500, 'Fund Transaction'), // withdrawal: not drawdown
+      ev('2026-01-05T13:00:00', 100),   // pnl 150, dd now 50
+    ]
+    const r = drawdownSummary({ events, trades: [], fundTransactions: [], baseBalance: 0 })
+    expect(r).toMatchObject({ maxDrawdown: 150, currentDrawdown: 50, source: 'cash' })
+    expect(r.maxDrawdownPct).toBeCloseTo(12.5) // 150 / 1200
+  })
+
+  it('is zero "now" at a new peak', () => {
+    const events = [ev('2026-01-05T10:00:00', -100), ev('2026-01-05T11:00:00', 300)]
+    expect(drawdownSummary({ events, trades: [], fundTransactions: [], baseBalance: null }))
+      .toEqual({ maxDrawdown: 100, maxDrawdownPct: null, currentDrawdown: 0, currentDrawdownPct: null, source: 'cash' })
+  })
+
+  it('falls back to trades + fund transactions without cash events', () => {
+    const trades = [trade(500, '2026-01-05T10:00:00'), trade(-200, '2026-01-06T10:00:00')]
+    const r = drawdownSummary({ events: [], trades, fundTransactions: [{ date: '2026-01-01', amount: 4500 }], baseBalance: 0 })
+    expect(r).toMatchObject({ maxDrawdown: 200, currentDrawdown: 200, source: 'trades' })
+    expect(r.maxDrawdownPct).toBeCloseTo(4) // 200 / 5000
+    expect(r.currentDrawdownPct).toBeCloseTo(4)
+  })
+
+  it('handles no data', () => {
+    expect(drawdownSummary({ events: [], trades: [], fundTransactions: [], baseBalance: null }))
+      .toEqual({ maxDrawdown: 0, maxDrawdownPct: null, currentDrawdown: 0, currentDrawdownPct: null, source: 'trades' })
   })
 })
