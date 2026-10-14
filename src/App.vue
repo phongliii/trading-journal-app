@@ -63,9 +63,10 @@
 import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { prefetchLoginView } from '@/router'
-import { startOfWeek, endOfWeek, format } from 'date-fns'
+import { format } from 'date-fns'
 import { useTradesStore } from '@/stores/trades'
 import { useBalanceStore } from '@/stores/balance'
+import { shouldRemindWithdraw } from '@/lib/withdrawReminder'
 import { useCashEventsStore } from '@/stores/cashEvents'
 import { useTimezoneStore } from '@/stores/timezone'
 import { useHolidayStore } from '@/stores/holidays'
@@ -121,51 +122,27 @@ const accountsStore      = useAccountsStore()
 const authStore         = useAuthStore()
 const toast          = useToast()
 
-// Weekly withdraw-reminder cycle:
-// - Starts on the first trading day of the week (Monday, or later if
-//   Monday/Tuesday/... are holidays).
-// - From there, checks every trading day: if a withdrawal (from an
-//   imported Cash History file) has landed since Monday, the week is
-//   "resolved" and it goes quiet for the rest of the week. Otherwise, if
-//   the balance is still at/above the threshold, it toasts again — once
-//   per calendar day, tracked via lastShownDate.
-// - Rolls over automatically once the week (its Monday) changes.
+// Withdraw reminder — the rule lives in lib/withdrawReminder.js: the week
+// is decided on its first trading day (balance going into that day at/above
+// the target → toast once per trading day the balance is still at/above
+// it, until a withdrawal this week;
+// below → no toast all week, even if the target is hit mid-week).
 function checkWithdrawReminder() {
   if (!withdrawReminderStore.enabled) return
-  const threshold = Number(withdrawReminderStore.amount)
-  if (!Number.isFinite(threshold) || threshold <= 0) return
-
   const today = tzStore.localDateObj()
-  const todayStr = format(today, 'yyyy-MM-dd')
-  if (withdrawReminderStore.lastShownDate === todayStr) return
-
-  const isWeekend = today.getDay() === 0 || today.getDay() === 6
-  if (isWeekend || holidayStore.isHoliday(todayStr)) return
-
-  // Today already passed the weekend/holiday check above, so it's
-  // necessarily on or after this week's first trading day — no separate
-  // guard needed for that.
-  const weekStart = startOfWeek(today, { weekStartsOn: 1 })
-  const weekEnd    = endOfWeek(today, { weekStartsOn: 1 })
-  const weekStartStr = format(weekStart, 'yyyy-MM-dd')
-  const weekEndStr    = format(weekEnd, 'yyyy-MM-dd')
-
-  withdrawReminderStore.ensureWeek(weekStartStr)
-  if (withdrawReminderStore.weekResolved) return
-
-  const withdrawnThisWeek = balanceStore.fundTransactions.some(
-    t => t.type === 'withdrawal' && t.date >= weekStartStr && t.date <= weekEndStr
-  )
-  if (withdrawnThisWeek) {
-    withdrawReminderStore.markWeekResolved()
-    return
-  }
-
-  if (balanceStore.currentBalance >= threshold) {
-    const amountStr = balanceStore.currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    toast.warn(`Balance is $${amountStr} — consider withdrawing.`)
-    withdrawReminderStore.markShown(todayStr)
-  }
+  const show = shouldRemindWithdraw({
+    today,
+    isHoliday: holidayStore.isHoliday,
+    threshold: Number(withdrawReminderStore.amount),
+    balanceData: { rawStarting: balanceStore.startingBalance, earliestBalanceDate: balanceStore.earliestBalanceDate },
+    fundTransactions: balanceStore.fundTransactions,
+    trades: tradesStore.trades,
+    lastShownDate: withdrawReminderStore.lastShownDate,
+  })
+  if (!show) return
+  const amountStr = balanceStore.currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  toast.warn(`Balance is $${amountStr} — consider withdrawing.`)
+  withdrawReminderStore.markShown(format(today, 'yyyy-MM-dd'))
 }
 
 // Warm the (lazy-loaded) Login page's chunk in the background once the

@@ -52,7 +52,7 @@
             v-model="withdrawAmount"
             @keydown.enter="$event.target.blur()" />
         </div>
-        <p class="text-2xs text-ink-faint mt-2">Starts on the first trading day of the week and repeats daily until a withdrawal is imported from a Cash History file, then goes quiet until next week.</p>
+        <p class="text-2xs text-ink-faint mt-2">Checked on the first trading day of each week: if your balance going into that day is at or above this amount, you're reminded every trading day that week that your balance is still at or above this amount, until a withdrawal is imported from a Cash History file. If it's below, there's no reminder that week, even if you reach the amount mid-week.</p>
       </div>
     </div>
 
