@@ -81,7 +81,7 @@
         </div>
       </DashboardCard>
 
-      <DashboardCard info-next :tooltip="equityMode === 'balance' ? 'Account balance over time, including deposits and withdrawals, for the selected range.' : 'Cumulative net P&L (after fees) over the selected range.'">
+      <DashboardCard info-next :tooltip="equityMode === 'balance' ? 'Account balance over the selected range. Deposits and withdrawals are marked with a dot; the line colour and the % on hover count trading P&L only (the % is against your balance at the start of the range).' : 'Cumulative net P&L (after fees) over the selected range.'">
         <template #header>
           <EquityModeTabs v-model="equityMode" :disabled="!balanceStore.hasBalance" />
         </template>
@@ -93,9 +93,8 @@
             :curve="equityMode === 'balance' ? balanceCurve : rangePnlCurve"
             :range="equityRange"
             :pnl-curve="rangePnlCurve"
-            :fund-base-curve="fundBaseCurve"
-            :base-balance="balanceStore.correctStarting"
-            :has-balance="balanceStore.hasBalance" />
+            :start-balance="rangeStartBalance"
+            :fund-transactions="equityMode === 'balance' ? balanceStore.fundTransactions : []" />
         </div>
       </DashboardCard>
     </section>
@@ -192,7 +191,7 @@ import { useBalanceStore } from '@/stores/balance'
 import { useCashEventsStore } from '@/stores/cashEvents'
 import { useTimezoneStore } from '@/stores/timezone'
 import { format } from 'date-fns'
-import { fmt, fmtPct, computeStats, drawdownSummary, computeBalanceCurve, computeFundBaseCurve, groupByMonth, groupByDow, resolvePeriodRange, filterTradesByDateRange, filterTradesByMonth } from '@/lib/stats'
+import { fmt, fmtPct, computeStats, drawdownSummary, computeBalanceCurve, groupByMonth, groupByDow, resolvePeriodRange, filterTradesByDateRange, filterTradesByMonth } from '@/lib/stats'
 import StatCard      from '@/components/ui/StatCard.vue'
 import PnlModeTabs   from '@/components/ui/PnlModeTabs.vue'
 import EquityModeTabs from '@/components/ui/EquityModeTabs.vue'
@@ -256,22 +255,31 @@ const initialLoading = computed(() =>
   tradesStore.trades.length === 0 && (tradesStore.loading || !balanceStore.loaded || !cashEventsStore.loaded)
 )
 
-// Capital base (starting balance adjusted only by deposits/withdrawals, never
-// by trading P&L) — full history, so the running base at any date stays
-// accurate regardless of the selected range.
-const fundBaseCurve = computed(() => {
+// Full balance history (starting balance + every trade + deposit/withdrawal).
+const fullBalanceCurve = computed(() => {
   if (!balanceStore.hasBalance) return []
-  return computeFundBaseCurve(balanceStore.fundTransactions, balanceStore.correctStarting)
+  return computeBalanceCurve(tradesStore.trades, balanceStore.fundTransactions, balanceStore.correctStarting)
 })
 
+// Balance line for the selected range: built from ALL history so cumulative
+// values stay accurate, then sliced. (equityRangeFrom comes from the app's
+// timezone-aware "today", not the raw browser Date.)
 const balanceCurve = computed(() => {
-  if (!balanceStore.hasBalance) return []
-  // Build the full curve from ALL history so cumulative values stay accurate,
-  // then slice to the selected range. (equityRangeFrom comes from the app's
-  // timezone-aware "today", not the raw browser Date.)
-  const full = computeBalanceCurve(tradesStore.trades, balanceStore.fundTransactions, balanceStore.correctStarting)
   const from = equityRangeFrom.value
-  return from ? full.filter(p => p.date.slice(0, 10) >= from) : full
+  return from ? fullBalanceCurve.value.filter(p => p.date.slice(0, 10) >= from) : fullBalanceCurve.value
+})
+
+// Balance going into the selected range — the chart's hover % is the range's
+// trading P&L against this, so deposits/withdrawals during the range can't
+// move it. Falls back to the first positive balance in the range (e.g. ALL
+// when the account was opened by a deposit, so the starting balance is $0).
+const rangeStartBalance = computed(() => {
+  if (!balanceStore.hasBalance) return null
+  const from = equityRangeFrom.value
+  const before = from ? fullBalanceCurve.value.filter(p => p.date.slice(0, 10) < from) : []
+  const start = before.length ? before[before.length - 1].value : balanceStore.correctStarting
+  if (start > 0) return start
+  return balanceCurve.value.find(p => p.value > 0)?.value ?? null
 })
 const totalGrossPnl = computed(() =>
   Math.round(tradesStore.trades.reduce((s, t) => s + (t.gross_pnl ?? t.pnl), 0) * 100) / 100
