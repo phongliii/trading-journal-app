@@ -12,6 +12,7 @@ import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue'
 import { Chart, LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
 import { format, parseISO, eachDayOfInterval, isWeekend, isSameWeek, differenceInCalendarDays } from 'date-fns'
 import { rangeStart } from '@/lib/realizedPnl'
+import { fmt } from '@/lib/stats'
 import { createExternalTooltip } from '@/lib/chartTooltip'
 import { useTimezoneStore } from '@/stores/timezone'
 
@@ -41,15 +42,14 @@ const zeroLinePlugin = {
 const props = defineProps({
   curve:  { type: Array,  default: () => [] }, // [{ date, value }] currently-plotted curve (equity or balance)
   range:  { type: String, default: '1M' }, // '1W' | '1M' | '3M' | 'YTD' | 'ALL' (see lib/realizedPnl.js)
-  // Trading P&L alone (never moved by deposits/withdrawals) and the
-  // capital base (starting balance adjusted only by deposits/withdrawals,
-  // never by trading P&L) — together these give a % that's pure trading
-  // performance against whatever capital was actually at risk, regardless
-  // of which curve above is being plotted.
+  // Trading P&L within the range (from 0 at its start, never moved by
+  // deposits/withdrawals) — drives the line colour and the hover %.
   pnlCurve:     { type: Array,  default: () => [] },
-  fundBaseCurve: { type: Array, default: () => [] },
-  baseBalance:  { type: Number, default: 0 },
-  hasBalance:   { type: Boolean, default: false },
+  // Balance going into the range; the hover % is pnlCurve ÷ this. null = no %.
+  startBalance: { type: Number, default: null },
+  // Deposits/withdrawals [{ date, amount }] to mark on the line — passed in
+  // Balance mode, where they move the line without being trading results.
+  fundTransactions: { type: Array, default: () => [] },
 })
 
 const canvas  = ref(null)
@@ -100,26 +100,28 @@ function buildChart() {
 
   const data = valuesAt(props.curve, isoDates, 0)
 
-  // Up/down (and thus the line color) is judged the same way Robinhood-style
-  // charts do it: relative to the start of the selected range, not just
-  // whether the raw number is above zero.
-  const firstValue = data[0] ?? 0
-  const lastValue  = data[data.length - 1] ?? 0
-  const isPos = (lastValue - firstValue) >= 0
+  // Up/down (and thus the line color) is judged Robinhood-style — relative
+  // to the start of the selected range — on TRADING P&L only (pnlCurve), so
+  // a withdrawal can't turn the Balance line red, nor a deposit green.
+  const pnlVals = valuesAt(props.pnlCurve, isoDates, 0)
+  const isPos = ((pnlVals[pnlVals.length - 1] ?? 0) - (pnlVals[0] ?? 0)) >= 0
   const color = isPos ? '#00c896' : '#ef4444'
 
-  // % shown alongside the $ amount in the tooltip: pure trading P&L against
-  // the capital base at that point in time. Deposits/withdrawals shift the
-  // base (fundBaseCurve) but never appear as a gain or loss in the P&L
-  // (pnlCurve) itself — so a withdrawal alone never moves the %, only future
-  // gains/losses measured against the smaller (or larger) base do.
-  const canShowPct = props.hasBalance
-  let pctData = null
-  if (canShowPct) {
-    const pnlBucket  = valuesAt(props.pnlCurve, isoDates, 0)
-    const baseBucket = valuesAt(props.fundBaseCurve, isoDates, props.baseBalance)
-    pctData = pnlBucket.map((pnl, i) => baseBucket[i] ? (pnl / baseBucket[i]) * 100 : null)
+  // Deposits/withdrawals per day → a marker on the line plus a hover note,
+  // so a withdrawal doesn't read as a losing day.
+  const fundByDay = {}
+  for (const f of props.fundTransactions) {
+    if (f.date) fundByDay[f.date.slice(0, 10)] = (fundByDay[f.date.slice(0, 10)] || 0) + f.amount
   }
+  const fundOnDay = isoDates.map(iso => fundByDay[iso] ?? null)
+  const FUND_IN = '#00c896', FUND_OUT = '#f59e0b'
+  const markerColors = fundOnDay.map(a => (a === null ? color : a >= 0 ? FUND_IN : FUND_OUT))
+
+  // % in the tooltip: trading P&L so far in the range ÷ the balance going
+  // into the range. Deposits/withdrawals during the range never move it.
+  const pctData = props.startBalance > 0
+    ? pnlVals.map(pnl => (pnl / props.startBalance) * 100)
+    : null
 
   chart = new Chart(canvas.value, {
     type: 'line',
@@ -130,9 +132,11 @@ function buildChart() {
         data,
         borderColor: color,
         borderWidth: 1.5,
-        pointRadius: 0,
+        pointRadius: fundOnDay.map(a => (a === null ? 0 : 4)),
         pointHoverRadius: 4,
-        pointHoverBackgroundColor: color,
+        pointBackgroundColor: markerColors,
+        pointBorderColor: markerColors,
+        pointHoverBackgroundColor: markerColors,
         fill: true,
         backgroundColor: ctx => {
           const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, ctx.chart.height)
@@ -158,8 +162,12 @@ function buildChart() {
             label: ctx => {
               const dollar = ' $' + ctx.parsed.y.toFixed(2)
               const pct = pctData ? pctData[ctx.dataIndex] : null
-              if (pct === null || pct === undefined) return dollar
-              return dollar + '  (' + (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%)'
+              const main = pct === null || pct === undefined
+                ? dollar
+                : dollar + '  (' + (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%)'
+              const fund = fundOnDay[ctx.dataIndex]
+              if (fund === null) return main
+              return [main, (fund >= 0 ? 'Deposit +' : 'Withdrawal -') + fmt(Math.abs(fund))]
             }
           }
         }
@@ -182,6 +190,6 @@ function buildChart() {
 }
 
 onMounted(buildChart)
-watch(() => [props.curve, props.range, props.pnlCurve, props.fundBaseCurve, props.baseBalance, props.hasBalance], buildChart, { deep: true })
+watch(() => [props.curve, props.range, props.pnlCurve, props.startBalance, props.fundTransactions], buildChart, { deep: true })
 onBeforeUnmount(() => { chart?.destroy(); tooltipCleanup() })
 </script>
