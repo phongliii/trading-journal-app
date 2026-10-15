@@ -346,10 +346,13 @@ describe('drawdownSummary', () => {
       ev('2026-01-05T09:00:00', 1000, 'Fund Transaction'),
       ev('2026-01-05T10:00:00', 200),   // pnl 200 (peak), account 1200
       ev('2026-01-05T11:00:00', -150),  // dd 150
-      ev('2026-01-05T12:00:00', -500, 'Fund Transaction'), // withdrawal: not drawdown
-      ev('2026-01-05T13:00:00', 100),   // pnl 150, dd now 50
+      ev('2026-01-06T09:00:00', -500, 'Fund Transaction'), // withdrawal: not drawdown
+      ev('2026-01-06T10:00:00', 100),   // pnl 150, dd now 50
     ]
-    const r = drawdownSummary({ events, trades: [], fundTransactions: [], baseBalance: 0 })
+    // The same activity as the app also holds it: trades + fund transactions.
+    const trades = [trade(200, '2026-01-05T10:00:00'), trade(-150, '2026-01-05T11:00:00'), trade(100, '2026-01-06T10:00:00')]
+    const funds = [{ date: '2026-01-05', amount: 1000 }, { date: '2026-01-06', amount: -500 }]
+    const r = drawdownSummary({ events, trades, fundTransactions: funds, baseBalance: 0 })
     expect(r).toMatchObject({ maxDrawdown: 150, currentDrawdown: 50, source: 'cash' })
     expect(r.maxDrawdownPct).toBeCloseTo(12.5) // 150 / 1200
   })
@@ -374,9 +377,24 @@ describe('drawdownSummary', () => {
       ev('2026-01-05T10:00:00', 100),
       ev('2026-01-06T10:00:00', -60),
     ]
-    const r = drawdownSummary({ events, trades: [], fundTransactions: [], baseBalance: 1000, from: '2026-01-05' })
+    const trades = [trade(-400, '2026-01-02T10:00:00'), trade(100, '2026-01-05T10:00:00'), trade(-60, '2026-01-06T10:00:00')]
+    const r = drawdownSummary({ events, trades, fundTransactions: [], baseBalance: 1000, from: '2026-01-05' })
     expect(r).toMatchObject({ maxDrawdown: 60, currentDrawdown: 60 })
     expect(r.maxDrawdownPct).toBeCloseTo(8.57) // 60 / (1000 - 400 + 100)
+  })
+
+  // Cash History may only cover recent weeks while trades go back further.
+  // The account value at the peak must still include those earlier trades.
+  it('measures % against the full account value, even when Cash History starts later', () => {
+    const events = [ev('2026-01-05T10:00:00', 100), ev('2026-01-06T10:00:00', -60)]
+    const trades = [
+      trade(5000, '2026-01-02T10:00:00'),  // before the first Cash History event
+      trade(100, '2026-01-05T10:00:00'),
+      trade(-60, '2026-01-06T10:00:00'),
+    ]
+    const r = drawdownSummary({ events, trades, fundTransactions: [], baseBalance: 10000 })
+    expect(r.maxDrawdown).toBe(60)
+    expect(r.maxDrawdownPct).toBeCloseTo(0.4, 2) // 60 / (10000 + 5000 + 100) = 0.397%
   })
 
   it('handles no data', () => {

@@ -590,33 +590,42 @@ export function computeSideBias(trades) {
  * @returns {{ maxDrawdown, maxDrawdownPct, currentDrawdown, currentDrawdownPct, source }}
  */
 export function drawdownSummary({ events, trades, fundTransactions, baseBalance, from = null }) {
-  let source = 'cash'
-  let list = events || []
-  if (!list.length) {
-    source = 'trades'
-    list = [
-      ...(trades || []).filter(t => t.sold_at).map(t => ({ timestamp: t.sold_at, type: 'Trade', delta: t.pnl })),
-      ...(fundTransactions || []).filter(f => f.date).map(f => ({ timestamp: f.date, type: 'Fund Transaction', delta: f.amount })),
-    ]
-  }
-  const sorted = [...list].sort((a, b) => a.timestamp.localeCompare(b.timestamp))
+  // Account-value timeline from EVERY trade + fund transaction — the same
+  // inputs as the Account Balance — so the % is right even when Cash
+  // History only covers part of the trade history.
+  const accountMoves = [
+    ...(trades || []).filter(t => t.sold_at).map(t => ({ timestamp: t.sold_at, type: 'Trade', delta: t.pnl })),
+    ...(fundTransactions || []).filter(f => f.date).map(f => ({ timestamp: f.date, type: 'Fund Transaction', delta: f.amount })),
+  ].sort((a, b) => a.timestamp.localeCompare(b.timestamp))
+
+  // Drawdown itself is measured on Cash History events when there are any
+  // (they include fees when charged), otherwise on the trades above.
+  const source = (events || []).length ? 'cash' : 'trades'
+  const sorted = source === 'cash'
+    ? [...events].sort((a, b) => a.timestamp.localeCompare(b.timestamp))
+    : accountMoves
   const withPct = baseBalance !== null && baseBalance !== undefined
 
-  let pnl = 0, account = withPct ? baseBalance : 0
-  let peak = 0, accountAtPeak = account
+  // Account value as of a timestamp (pointer walk — both lists are sorted).
+  let mi = 0, account = withPct ? baseBalance : 0
+  const accountAt = (ts) => {
+    while (mi < accountMoves.length && accountMoves[mi].timestamp <= ts) account += accountMoves[mi++].delta
+    return account
+  }
+
+  let pnl = 0, peak = 0, accountAtPeak = withPct ? baseBalance : 0
   let maxDD = 0, maxDDPct = 0
   for (const e of sorted) {
-    account += e.delta
+    const acct = accountAt(e.timestamp)
     // Before the window: only moves the account value the window starts from.
-    if (from && e.timestamp.slice(0, 10) < from) { accountAtPeak = account; continue }
+    if (from && e.timestamp.slice(0, 10) < from) { accountAtPeak = acct; continue }
     if (e.type === 'Fund Transaction') {
-      // Moving money in/out shifts the account value but isn't P&L; keep the
-      // peak's account value in step so % stays relative to real capital.
-      if (pnl >= peak) accountAtPeak = account
+      // Moving money in/out shifts the account value but isn't P&L.
+      if (pnl >= peak) accountAtPeak = acct
       continue
     }
     pnl += e.delta
-    if (pnl >= peak) { peak = pnl; accountAtPeak = account }
+    if (pnl >= peak) { peak = pnl; accountAtPeak = acct }
     const dd = peak - pnl
     if (dd > maxDD) {
       maxDD = dd

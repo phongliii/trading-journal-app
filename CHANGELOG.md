@@ -48,6 +48,10 @@
   clicked day from the previous/next month isn't faded while its options show.
 
 ### Fixed
+- Max Drawdown %: when Cash History didn't go back as far as your trades, the
+  account value at the peak missed the earlier trades, so the % came out too
+  high. It's now measured against the same balance as the Account Balance
+  card (all trades and deposits/withdrawals).
 - Equity / Balance chart: the newest date on the axis could be skipped, and on
   3M / YTD / ALL each point was a whole week, so it was unclear which days it
   covered. The chart now has one point per day on every tab (weekends skipped
