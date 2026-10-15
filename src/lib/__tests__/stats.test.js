@@ -397,6 +397,18 @@ describe('drawdownSummary', () => {
     expect(r.maxDrawdownPct).toBeCloseTo(0.4, 2) // 60 / (10000 + 5000 + 100) = 0.397%
   })
 
+  // Losses refilled by a deposit, then more losses: the $ drop exceeds the
+  // account value at the peak, but the % must stay a real, < 100% figure.
+  it('keeps the % under 100% when deposits refill the account between losses', () => {
+    const trades = [trade(-900, '2026-01-05T10:00:00'), trade(-900, '2026-01-07T10:00:00')]
+    const funds = [{ date: '2026-01-06', amount: 1000 }]
+    const r = drawdownSummary({ events: [], trades, fundTransactions: funds, baseBalance: 1000 })
+    expect(r.maxDrawdown).toBe(1800)
+    // 1000 → 100 (−90%), +1000 deposit → 1100 → 200 (−81.8%): 1 − 0.1 × 0.1818 = 98.18%
+    expect(r.maxDrawdownPct).toBeCloseTo(98.18, 1)
+    expect(r.maxDrawdownPct).toBeLessThan(100)
+  })
+
   it('handles no data', () => {
     expect(drawdownSummary({ events: [], trades: [], fundTransactions: [], baseBalance: null }))
       .toEqual({ maxDrawdown: 0, maxDrawdownPct: null, currentDrawdown: 0, currentDrawdownPct: null, source: 'trades' })

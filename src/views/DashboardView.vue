@@ -288,15 +288,16 @@ const drawdown = computed(() => drawdownSummary({
   baseBalance: balanceStore.hasBalance ? balanceStore.correctStarting : null,
   from: equityRangeFrom.value,
 }))
-// "(x%)" of the account at the peak, next to the $ value — only when a
-// starting balance makes it meaningful.
+// "(x%)" time-weighted drawdown (see drawdownSummary), next to the $ value —
+// only when a starting balance makes it meaningful.
 const drawdownPct = computed(() => {
   const d = drawdown.value
   return d.maxDrawdownPct !== null && d.maxDrawdown > 0 ? `(${fmtPct(d.maxDrawdownPct)})` : ''
 })
 const drawdownTooltip = computed(() =>
   'Largest peak-to-trough drop in realized P&L over the range selected on the Equity / Balance chart ' +
-  '(deposits and withdrawals don\'t count). The % is of your account value at that peak. ' +
+  '(deposits and withdrawals don\'t count). The % is time-weighted: each trade is measured against your ' +
+  'balance just before it, so deposits and withdrawals don\'t distort it. ' +
   (drawdown.value.source === 'cash'
     ? 'From Cash History, including fees when charged.'
     : 'From trades (no Cash History imported), using each trade\'s net P&L.'))

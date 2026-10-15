@@ -48,6 +48,10 @@
   clicked day from the previous/next month isn't faded while its options show.
 
 ### Fixed
+- Max Drawdown % could go over 100% (e.g. "$6,103.52 (451.35%)") when
+  deposits had refilled the account between losses. The % is now
+  time-weighted: each trade against the balance just before it, chained
+  together, so deposits and withdrawals don't distort it.
 - Max Drawdown %: when Cash History didn't go back as far as your trades, the
   account value at the peak missed the earlier trades, so the % came out too
   high. It's now measured against the same balance as the Account Balance
