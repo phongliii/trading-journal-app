@@ -568,77 +568,34 @@ export function computeSideBias(trades) {
 }
 
 /**
- * Drawdown summary for the Dashboard's Max Drawdown card (all time, or from
- * `from` on — the card follows the Equity / Balance chart's range tab).
+ * Max drawdown ($) for the Dashboard's Max Drawdown card — all time, or from
+ * `from` on (the card follows the Equity / Balance chart's range tab).
  *
- * Uses the raw cash events (fills, fees, fund transactions) when there are
- * any; otherwise falls back to trades (each trade's net P&L at its close
- * time) plus fund transactions, so the card isn't stuck at $0 when no Cash
- * History has been imported. Deposits/withdrawals never count as drawdown.
- *
- * Percentages are of the ACCOUNT value at the peak the drop is measured
- * from (baseBalance + everything up to that point), so they're only given
- * when a starting balance is set (`baseBalance` not null).
+ * The largest drop in realized P&L from a peak, measured on the raw cash
+ * events (fills, fees) when there are any, otherwise on trades (each
+ * trade's net P&L at its close), so the card isn't stuck at $0 without
+ * Cash History. Deposits/withdrawals never count.
  *
  * @param {object} o
- * @param {Array}  o.events           [{ timestamp, type, delta }] cash events
- * @param {Array}  o.trades           [{ sold_at, pnl }]
- * @param {Array}  o.fundTransactions [{ date, amount }]
- * @param {number|null} o.baseBalance account value before the first event, or null
- * @param {string|null} [o.from]      'yyyy-MM-dd' — only measure from this day on
- *   (the peak starts at the account's level going into it); null = all time
- * @returns {{ maxDrawdown, maxDrawdownPct, currentDrawdown, currentDrawdownPct, source }}
+ * @param {Array}  o.events  [{ timestamp, type, delta }] cash events
+ * @param {Array}  o.trades  [{ sold_at, pnl }]
+ * @param {string|null} [o.from] 'yyyy-MM-dd' — only measure from this day on; null = all time
+ * @returns {{ maxDrawdown: number, source: 'cash' | 'trades' }}
  */
-export function drawdownSummary({ events, trades, fundTransactions, baseBalance, from = null }) {
-  // Account-value timeline from EVERY trade + fund transaction — the same
-  // inputs as the Account Balance — so the % is right even when Cash
-  // History only covers part of the trade history.
-  const accountMoves = [
-    ...(trades || []).filter(t => t.sold_at).map(t => ({ timestamp: t.sold_at, type: 'Trade', delta: t.pnl })),
-    ...(fundTransactions || []).filter(f => f.date).map(f => ({ timestamp: f.date, type: 'Fund Transaction', delta: f.amount })),
-  ].sort((a, b) => a.timestamp.localeCompare(b.timestamp))
-
-  // Drawdown itself is measured on Cash History events when there are any
-  // (they include fees when charged), otherwise on the trades above.
+export function drawdownSummary({ events, trades, from = null }) {
   const source = (events || []).length ? 'cash' : 'trades'
-  const sorted = source === 'cash'
-    ? [...events].sort((a, b) => a.timestamp.localeCompare(b.timestamp))
-    : accountMoves
-  const withPct = baseBalance !== null && baseBalance !== undefined
+  const list = source === 'cash'
+    ? events
+    : (trades || []).filter(t => t.sold_at).map(t => ({ timestamp: t.sold_at, type: 'Trade', delta: t.pnl }))
+  const sorted = [...list].sort((a, b) => a.timestamp.localeCompare(b.timestamp))
 
-  // Account value as of a timestamp (pointer walk — both lists are sorted).
-  let mi = 0, account = withPct ? baseBalance : 0
-  const accountAt = (ts) => {
-    while (mi < accountMoves.length && accountMoves[mi].timestamp <= ts) account += accountMoves[mi++].delta
-    return account
-  }
-
-  let pnl = 0, peak = 0, accountAtPeak = withPct ? baseBalance : 0
-  let maxDD = 0, maxDDPct = 0
+  let pnl = 0, peak = 0, maxDD = 0
   for (const e of sorted) {
-    const acct = accountAt(e.timestamp)
-    // Before the window: only moves the account value the window starts from.
-    if (from && e.timestamp.slice(0, 10) < from) { accountAtPeak = acct; continue }
-    if (e.type === 'Fund Transaction') {
-      // Moving money in/out shifts the account value but isn't P&L.
-      if (pnl >= peak) accountAtPeak = acct
-      continue
-    }
+    if (from && e.timestamp.slice(0, 10) < from) continue
+    if (e.type === 'Fund Transaction') continue // never P&L, never drawdown
     pnl += e.delta
-    if (pnl >= peak) { peak = pnl; accountAtPeak = acct }
-    const dd = peak - pnl
-    if (dd > maxDD) {
-      maxDD = dd
-      maxDDPct = withPct && accountAtPeak > 0 ? (dd / accountAtPeak) * 100 : 0
-    }
+    if (pnl > peak) peak = pnl
+    if (peak - pnl > maxDD) maxDD = peak - pnl
   }
-  const current = peak - pnl
-  const r2 = (v) => Math.round(v * 100) / 100
-  return {
-    maxDrawdown: r2(maxDD),
-    maxDrawdownPct: withPct ? r2(maxDDPct) : null,
-    currentDrawdown: r2(current),
-    currentDrawdownPct: withPct && accountAtPeak > 0 ? r2((current / accountAtPeak) * 100) : null,
-    source,
-  }
+  return { maxDrawdown: Math.round(maxDD * 100) / 100, source }
 }

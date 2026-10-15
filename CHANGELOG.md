@@ -4,9 +4,9 @@
 
 ### Changed
 - Dashboard **Max Drawdown** card follows the Equity / Balance chart's range
-  tab (1W / 1M / 3M / YTD / ALL) instead of always being all-time; with a
-  starting balance set it also shows the drop as a % of the account at the
-  peak, in parentheses next to the amount, e.g. "$282.00 (6.1%)". Without Cash History it falls back to trades instead of showing $0.
+  tab (1W / 1M / 3M / YTD / ALL) instead of always being all-time, and its
+  title shows the tab (e.g. "Max Drawdown · 1M"). Without Cash History it
+  falls back to trades instead of showing $0.
 - Sidebar: the storage label now reads "Synced to cloud" instead of "Local
   storage" (data has lived in Supabase for a while).
 - Settings → Withdraw reminder: clearer explanation, including that the
@@ -48,10 +48,6 @@
   clicked day from the previous/next month isn't faded while its options show.
 
 ### Fixed
-- Max Drawdown %: when Cash History didn't go back as far as your trades, the
-  account value at the peak missed the earlier trades, so the % came out too
-  high. It's now measured against the same balance as the Account Balance
-  card (all trades and deposits/withdrawals).
 - Equity / Balance chart: the newest date on the axis could be skipped, and on
   3M / YTD / ALL each point was a whole week, so it was unclear which days it
   covered. The chart now has one point per day on every tab (weekends skipped

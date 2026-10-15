@@ -25,7 +25,6 @@
       <p class="stat-num" :class="valueClass">
         <CompactValue v-if="rawValue !== null" :value="rawValue" />
         <template v-else>{{ value }}</template>
-        <span v-if="suffix" class="text-sm font-medium opacity-80 ml-1">{{ suffix }}</span>
       </p>
       <p v-if="sub" class="text-xs text-ink-muted mt-0.5">{{ sub }}</p>
     </div>
@@ -42,7 +41,6 @@ defineProps({
   value:      { type: String, default: '' },
   rawValue:   { type: Number, default: null },
   sub:        { type: String, default: '' },
-  suffix:     { type: String, default: '' }, // shown right after the value, e.g. "(6.1%)"
   valueClass: { type: String, default: '' },
   tooltip:    { type: String, default: '' },
 })

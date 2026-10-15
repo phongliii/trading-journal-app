@@ -341,64 +341,33 @@ describe('behaviour analytics', () => {
 describe('drawdownSummary', () => {
   const ev = (timestamp, delta, type = 'Trade Paired') => ({ timestamp, delta, type })
 
-  it('reports max and current drawdown from cash events, ignoring fund moves', () => {
+  it('measures the largest realized-P&L drop from cash events, ignoring fund moves', () => {
     const events = [
       ev('2026-01-05T09:00:00', 1000, 'Fund Transaction'),
-      ev('2026-01-05T10:00:00', 200),   // pnl 200 (peak), account 1200
-      ev('2026-01-05T11:00:00', -150),  // dd 150
+      ev('2026-01-05T10:00:00', 200),
+      ev('2026-01-05T11:00:00', -150),
       ev('2026-01-06T09:00:00', -500, 'Fund Transaction'), // withdrawal: not drawdown
-      ev('2026-01-06T10:00:00', 100),   // pnl 150, dd now 50
+      ev('2026-01-06T10:00:00', 100),
     ]
-    // The same activity as the app also holds it: trades + fund transactions.
-    const trades = [trade(200, '2026-01-05T10:00:00'), trade(-150, '2026-01-05T11:00:00'), trade(100, '2026-01-06T10:00:00')]
-    const funds = [{ date: '2026-01-05', amount: 1000 }, { date: '2026-01-06', amount: -500 }]
-    const r = drawdownSummary({ events, trades, fundTransactions: funds, baseBalance: 0 })
-    expect(r).toMatchObject({ maxDrawdown: 150, currentDrawdown: 50, source: 'cash' })
-    expect(r.maxDrawdownPct).toBeCloseTo(12.5) // 150 / 1200
+    expect(drawdownSummary({ events, trades: [] })).toEqual({ maxDrawdown: 150, source: 'cash' })
   })
 
-  it('is zero "now" at a new peak', () => {
-    const events = [ev('2026-01-05T10:00:00', -100), ev('2026-01-05T11:00:00', 300)]
-    expect(drawdownSummary({ events, trades: [], fundTransactions: [], baseBalance: null }))
-      .toEqual({ maxDrawdown: 100, maxDrawdownPct: null, currentDrawdown: 0, currentDrawdownPct: null, source: 'cash' })
+  it('counts losses on both sides of a deposit', () => {
+    const events = [ev('2026-01-05T10:00:00', -900), ev('2026-01-06T09:00:00', 1000, 'Fund Transaction'), ev('2026-01-07T10:00:00', -900)]
+    expect(drawdownSummary({ events, trades: [] }).maxDrawdown).toBe(1800)
   })
 
-  it('falls back to trades + fund transactions without cash events', () => {
-    const trades = [trade(500, '2026-01-05T10:00:00'), trade(-200, '2026-01-06T10:00:00')]
-    const r = drawdownSummary({ events: [], trades, fundTransactions: [{ date: '2026-01-01', amount: 4500 }], baseBalance: 0 })
-    expect(r).toMatchObject({ maxDrawdown: 200, currentDrawdown: 200, source: 'trades' })
-    expect(r.maxDrawdownPct).toBeCloseTo(4) // 200 / 5000
-    expect(r.currentDrawdownPct).toBeCloseTo(4)
+  it('falls back to trades without cash events', () => {
+    const trades = [trade(500, '2026-01-05T10:00:00'), trade(-200, '2026-01-06T10:00:00'), trade(50, null)]
+    expect(drawdownSummary({ events: [], trades })).toEqual({ maxDrawdown: 200, source: 'trades' })
   })
 
   it('only measures from the window start when given one', () => {
-    const events = [
-      ev('2026-01-02T10:00:00', -400),  // before the window: ignored for drawdown
-      ev('2026-01-05T10:00:00', 100),
-      ev('2026-01-06T10:00:00', -60),
-    ]
-    const trades = [trade(-400, '2026-01-02T10:00:00'), trade(100, '2026-01-05T10:00:00'), trade(-60, '2026-01-06T10:00:00')]
-    const r = drawdownSummary({ events, trades, fundTransactions: [], baseBalance: 1000, from: '2026-01-05' })
-    expect(r).toMatchObject({ maxDrawdown: 60, currentDrawdown: 60 })
-    expect(r.maxDrawdownPct).toBeCloseTo(8.57) // 60 / (1000 - 400 + 100)
-  })
-
-  // Cash History may only cover recent weeks while trades go back further.
-  // The account value at the peak must still include those earlier trades.
-  it('measures % against the full account value, even when Cash History starts later', () => {
-    const events = [ev('2026-01-05T10:00:00', 100), ev('2026-01-06T10:00:00', -60)]
-    const trades = [
-      trade(5000, '2026-01-02T10:00:00'),  // before the first Cash History event
-      trade(100, '2026-01-05T10:00:00'),
-      trade(-60, '2026-01-06T10:00:00'),
-    ]
-    const r = drawdownSummary({ events, trades, fundTransactions: [], baseBalance: 10000 })
-    expect(r.maxDrawdown).toBe(60)
-    expect(r.maxDrawdownPct).toBeCloseTo(0.4, 2) // 60 / (10000 + 5000 + 100) = 0.397%
+    const events = [ev('2026-01-02T10:00:00', -400), ev('2026-01-05T10:00:00', 100), ev('2026-01-06T10:00:00', -60)]
+    expect(drawdownSummary({ events, trades: [], from: '2026-01-05' }).maxDrawdown).toBe(60)
   })
 
   it('handles no data', () => {
-    expect(drawdownSummary({ events: [], trades: [], fundTransactions: [], baseBalance: null }))
-      .toEqual({ maxDrawdown: 0, maxDrawdownPct: null, currentDrawdown: 0, currentDrawdownPct: null, source: 'trades' })
+    expect(drawdownSummary({ events: [], trades: [] })).toEqual({ maxDrawdown: 0, source: 'trades' })
   })
 })
