@@ -568,73 +568,34 @@ export function computeSideBias(trades) {
 }
 
 /**
- * Drawdown summary for the Dashboard's Max Drawdown card (all time, or from
- * `from` on — the card follows the Equity / Balance chart's range tab).
+ * Max drawdown ($) for the Dashboard's Max Drawdown card — all time, or from
+ * `from` on (the card follows the Equity / Balance chart's range tab).
  *
- * $ amount: the largest drop in realized P&L from a peak, measured on the
- * raw cash events (fills, fees) when there are any, otherwise on trades
- * (each trade's net P&L at its close). Deposits/withdrawals never count.
- *
- * %: TIME-WEIGHTED — each P&L move is taken as a return on the account
- * value just before it, the returns are chained into an index, and the %
- * is the largest peak-to-trough fall of that index. Deposits/withdrawals
- * change the account value but not the index, so topping the account up
- * after losses can't push the % past 100% (dividing the $ drop by the
- * account at the peak could, e.g. "$6,103 (451%)"). Needs a starting
- * balance (`baseBalance`), since the account value is starting balance +
- * every trade + fund transaction — the same inputs as the Account Balance.
+ * The largest drop in realized P&L from a peak, measured on the raw cash
+ * events (fills, fees) when there are any, otherwise on trades (each
+ * trade's net P&L at its close), so the card isn't stuck at $0 without
+ * Cash History. Deposits/withdrawals never count.
  *
  * @param {object} o
- * @param {Array}  o.events           [{ timestamp, type, delta }] cash events
- * @param {Array}  o.trades           [{ sold_at, pnl }]
- * @param {Array}  o.fundTransactions [{ date, amount }]
- * @param {number|null} o.baseBalance account value before the first trade/fund move, or null
- * @param {string|null} [o.from]      'yyyy-MM-dd' — only measure from this day on; null = all time
- * @returns {{ maxDrawdown, maxDrawdownPct, currentDrawdown, currentDrawdownPct, source }}
+ * @param {Array}  o.events  [{ timestamp, type, delta }] cash events
+ * @param {Array}  o.trades  [{ sold_at, pnl }]
+ * @param {string|null} [o.from] 'yyyy-MM-dd' — only measure from this day on; null = all time
+ * @returns {{ maxDrawdown: number, source: 'cash' | 'trades' }}
  */
-export function drawdownSummary({ events, trades, fundTransactions, baseBalance, from = null }) {
-  const accountMoves = [
-    ...(trades || []).filter(t => t.sold_at).map(t => ({ timestamp: t.sold_at, type: 'Trade', delta: t.pnl })),
-    ...(fundTransactions || []).filter(f => f.date).map(f => ({ timestamp: f.date, type: 'Fund Transaction', delta: f.amount })),
-  ].sort((a, b) => a.timestamp.localeCompare(b.timestamp))
-
+export function drawdownSummary({ events, trades, from = null }) {
   const source = (events || []).length ? 'cash' : 'trades'
-  const sorted = source === 'cash'
-    ? [...events].sort((a, b) => a.timestamp.localeCompare(b.timestamp))
-    : accountMoves
-  const withPct = baseBalance !== null && baseBalance !== undefined
-
-  // Account value just BEFORE a timestamp (pointer walk — both sorted).
-  let mi = 0, account = withPct ? baseBalance : 0
-  const accountBefore = (ts) => {
-    while (mi < accountMoves.length && accountMoves[mi].timestamp < ts) account += accountMoves[mi++].delta
-    return account
-  }
+  const list = source === 'cash'
+    ? events
+    : (trades || []).filter(t => t.sold_at).map(t => ({ timestamp: t.sold_at, type: 'Trade', delta: t.pnl }))
+  const sorted = [...list].sort((a, b) => a.timestamp.localeCompare(b.timestamp))
 
   let pnl = 0, peak = 0, maxDD = 0
-  let index = 1, peakIndex = 1, maxDDPct = 0
   for (const e of sorted) {
     if (from && e.timestamp.slice(0, 10) < from) continue
     if (e.type === 'Fund Transaction') continue // never P&L, never drawdown
-
-    if (withPct) {
-      const before = accountBefore(e.timestamp)
-      if (before > 0) index *= Math.max(0, 1 + e.delta / before)
-      if (index > peakIndex) peakIndex = index
-      const ddPct = peakIndex > 0 ? (1 - index / peakIndex) * 100 : 0
-      if (ddPct > maxDDPct) maxDDPct = ddPct
-    }
-
     pnl += e.delta
     if (pnl > peak) peak = pnl
     if (peak - pnl > maxDD) maxDD = peak - pnl
   }
-  const r2 = (v) => Math.round(v * 100) / 100
-  return {
-    maxDrawdown: r2(maxDD),
-    maxDrawdownPct: withPct ? r2(maxDDPct) : null,
-    currentDrawdown: r2(peak - pnl),
-    currentDrawdownPct: withPct && peakIndex > 0 ? r2((1 - index / peakIndex) * 100) : null,
-    source,
-  }
+  return { maxDrawdown: Math.round(maxDD * 100) / 100, source }
 }
