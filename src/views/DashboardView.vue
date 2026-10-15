@@ -81,7 +81,7 @@
         </div>
       </DashboardCard>
 
-      <DashboardCard info-next :tooltip="equityMode === 'balance' ? 'Account balance over the selected range. Deposits and withdrawals are marked with a dot; the line colour and the % on hover count trading P&L only (the % is against your balance at the start of the range).' : 'Cumulative net P&L (after fees) over the selected range.'">
+      <DashboardCard info-next :tooltip="equityMode === 'balance' ? 'Account balance over the selected range. Deposits and withdrawals are marked with a dot; the line colour follows trading P&L only. The % on hover is trading P&L ÷ money you\'ve put in (starting balance + deposits − withdrawals).' : 'Cumulative net P&L (after fees) over the selected range.'">
         <template #header>
           <EquityModeTabs v-model="equityMode" :disabled="!balanceStore.hasBalance" />
         </template>
@@ -93,7 +93,8 @@
             :curve="equityMode === 'balance' ? balanceCurve : rangePnlCurve"
             :range="equityRange"
             :pnl-curve="rangePnlCurve"
-            :start-balance="rangeStartBalance"
+            :capital-curve="capitalCurve"
+            :base-capital="balanceStore.hasBalance ? balanceStore.correctStarting : null"
             :fund-transactions="equityMode === 'balance' ? balanceStore.fundTransactions : []" />
         </div>
       </DashboardCard>
@@ -191,7 +192,7 @@ import { useBalanceStore } from '@/stores/balance'
 import { useCashEventsStore } from '@/stores/cashEvents'
 import { useTimezoneStore } from '@/stores/timezone'
 import { format } from 'date-fns'
-import { fmt, fmtPct, computeStats, drawdownSummary, computeBalanceCurve, groupByMonth, groupByDow, resolvePeriodRange, filterTradesByDateRange, filterTradesByMonth } from '@/lib/stats'
+import { fmt, fmtPct, computeStats, drawdownSummary, computeBalanceCurve, computeFundBaseCurve, groupByMonth, groupByDow, resolvePeriodRange, filterTradesByDateRange, filterTradesByMonth } from '@/lib/stats'
 import StatCard      from '@/components/ui/StatCard.vue'
 import PnlModeTabs   from '@/components/ui/PnlModeTabs.vue'
 import EquityModeTabs from '@/components/ui/EquityModeTabs.vue'
@@ -269,17 +270,13 @@ const balanceCurve = computed(() => {
   return from ? fullBalanceCurve.value.filter(p => p.date.slice(0, 10) >= from) : fullBalanceCurve.value
 })
 
-// Balance going into the selected range — the chart's hover % is the range's
-// trading P&L against this, so deposits/withdrawals during the range can't
-// move it. Falls back to the first positive balance in the range (e.g. ALL
-// when the account was opened by a deposit, so the starting balance is $0).
-const rangeStartBalance = computed(() => {
-  if (!balanceStore.hasBalance) return null
-  const from = equityRangeFrom.value
-  const before = from ? fullBalanceCurve.value.filter(p => p.date.slice(0, 10) < from) : []
-  const start = before.length ? before[before.length - 1].value : balanceStore.correctStarting
-  if (start > 0) return start
-  return balanceCurve.value.find(p => p.value > 0)?.value ?? null
+// Money put in over time: starting balance + deposits − withdrawals (no
+// trading P&L). The chart's hover % is trading P&L ÷ this at each point —
+// e.g. $5,000 in and −$2,500 traded is −50%; withdraw $1,000 and the same
+// −$2,500 is −62.5% of the $4,000 left in.
+const capitalCurve = computed(() => {
+  if (!balanceStore.hasBalance) return []
+  return computeFundBaseCurve(balanceStore.fundTransactions, balanceStore.correctStarting)
 })
 const totalGrossPnl = computed(() =>
   Math.round(tradesStore.trades.reduce((s, t) => s + (t.gross_pnl ?? t.pnl), 0) * 100) / 100

@@ -52,8 +52,9 @@
   could turn red after a withdrawal, and the % on hover jumped (it was
   measured against deposited money, which a withdrawal shrinks). The colour
   now follows trading P&L only, deposits/withdrawals are marked with a dot
-  and labelled on hover (e.g. "Withdrawal −$800.00"), and the % is trading
-  P&L against your balance at the start of the range.
+  and labelled on hover (e.g. "Withdrawal −$800.00"). The % on hover is
+  trading P&L ÷ money put in (starting balance + deposits − withdrawals):
+  $5,000 in and −$2,500 traded is −50%; withdraw $1,000 and it's −62.5%.
 - Equity / Balance chart: the newest date on the axis could be skipped, and on
   3M / YTD / ALL each point was a whole week, so it was unclear which days it
   covered. The chart now has one point per day on every tab (weekends skipped
