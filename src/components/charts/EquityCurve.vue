@@ -45,8 +45,11 @@ const props = defineProps({
   // Trading P&L within the range (from 0 at its start, never moved by
   // deposits/withdrawals) — drives the line colour and the hover %.
   pnlCurve:     { type: Array,  default: () => [] },
-  // Balance going into the range; the hover % is pnlCurve ÷ this. null = no %.
-  startBalance: { type: Number, default: null },
+  // Money put in over time (starting balance + deposits − withdrawals) and
+  // its value before the first deposit/withdrawal; the hover % is pnlCurve ÷
+  // this at each point. baseCapital null = no starting balance, no %.
+  capitalCurve: { type: Array,  default: () => [] },
+  baseCapital:  { type: Number, default: null },
   // Deposits/withdrawals [{ date, amount }] to mark on the line — passed in
   // Balance mode, where they move the line without being trading results.
   fundTransactions: { type: Array, default: () => [] },
@@ -117,11 +120,14 @@ function buildChart() {
   const FUND_IN = '#00c896', FUND_OUT = '#f59e0b'
   const markerColors = fundOnDay.map(a => (a === null ? color : a >= 0 ? FUND_IN : FUND_OUT))
 
-  // % in the tooltip: trading P&L so far in the range ÷ the balance going
-  // into the range. Deposits/withdrawals during the range never move it.
-  const pctData = props.startBalance > 0
-    ? pnlVals.map(pnl => (pnl / props.startBalance) * 100)
-    : null
+  // % in the tooltip: trading P&L ÷ money put in at that point. A withdrawal
+  // lowers the money put in (so the same loss is a bigger %), a deposit
+  // raises it — but neither is ever counted as P&L.
+  let pctData = null
+  if (props.baseCapital !== null) {
+    const capital = valuesAt(props.capitalCurve, isoDates, props.baseCapital)
+    pctData = pnlVals.map((pnl, i) => (capital[i] > 0 ? (pnl / capital[i]) * 100 : null))
+  }
 
   chart = new Chart(canvas.value, {
     type: 'line',
@@ -190,6 +196,6 @@ function buildChart() {
 }
 
 onMounted(buildChart)
-watch(() => [props.curve, props.range, props.pnlCurve, props.startBalance, props.fundTransactions], buildChart, { deep: true })
+watch(() => [props.curve, props.range, props.pnlCurve, props.capitalCurve, props.baseCapital, props.fundTransactions], buildChart, { deep: true })
 onBeforeUnmount(() => { chart?.destroy(); tooltipCleanup() })
 </script>
