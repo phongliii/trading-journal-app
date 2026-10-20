@@ -1,16 +1,16 @@
 <template>
   <slot :trigger="openPicker" />
 
-  <!-- Import CSV modal: Trade tab (Position required, Cash optional) and
-       Account tab (Balance only), so balance-only imports aren't blocked
-       on having a Position History file. -->
+  <!-- Import CSV modal: one drop zone for any mix of Position History, Cash
+       History and Account Balance History — each file does its own part
+       (see importFiles / lib/tradeImport.js). -->
   <Teleport to="body">
     <div v-if="modalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" @click.self="closeModal">
       <div class="bg-surface-2 border border-border rounded-xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col">
         <div class="px-5 py-4 border-b border-border flex items-center justify-between flex-shrink-0">
           <div>
             <h2 class="text-sm font-semibold text-ink">Import CSV</h2>
-            <p class="text-xs text-ink-muted mt-0.5">Import trades, or set up account balance.</p>
+            <p class="text-xs text-ink-muted mt-0.5">Drop any of your broker files — each one can be imported on its own.</p>
           </div>
           <TooltipWrap tip="Close">
             <button class="text-ink-faint hover:text-ink transition-colors flex-shrink-0" @click="closeModal">
@@ -21,65 +21,29 @@
           </TooltipWrap>
         </div>
 
-        <div class="px-5 pt-3 flex gap-1 border-b border-border flex-shrink-0">
-          <button
-            class="px-3 py-1.5 text-xs font-medium border-b-2 -mb-px transition-colors"
-            :class="activeTab === 'trade' ? 'text-brand border-brand' : 'text-ink-faint border-transparent hover:text-ink-muted'"
-            @click="activeTab = 'trade'">
-            Trade
-          </button>
-          <button
-            class="px-3 py-1.5 text-xs font-medium border-b-2 -mb-px transition-colors"
-            :class="activeTab === 'account' ? 'text-brand border-brand' : 'text-ink-faint border-transparent hover:text-ink-muted'"
-            @click="activeTab = 'account'">
-            Account
-          </button>
-        </div>
-
         <div class="p-5 space-y-4 overflow-y-auto">
-
-          <template v-if="activeTab === 'trade'">
-            <div>
-              <p class="text-xs font-medium text-ink mb-1.5">
-                CSV Files <span class="text-ink-faint font-normal">— Position History required, Cash History optional</span>
-              </p>
-              <FileDropZone
-                accept=".csv,.tsv,.txt,text/csv,text/plain,text/tab-separated-values,application/vnd.ms-excel"
-                hint="Drop one or both files — the type is detected automatically"
-                @files="onTradeFiles" />
-              <ul v-if="tradeFileList.length" class="mt-3 space-y-2">
-                <FileListRow
-                  v-for="f in tradeFileList" :key="f.zone"
-                  :name="f.file.name" :status="f.label" :ok="true"
-                  @remove="zoneFiles[f.zone] = null" />
-              </ul>
-            </div>
-          </template>
-
-          <template v-else>
-            <div>
-              <p class="text-xs font-medium text-ink mb-1.5">Account Balance History <span class="text-down">*</span></p>
-              <FileDropZone
-                accept=".csv,.tsv,.txt,text/csv,text/plain,text/tab-separated-values,application/vnd.ms-excel"
-                :multiple="false"
-                hint="Account_Balance_History.csv"
-                @files="onBalanceFiles" />
-              <ul v-if="accountFileList.length" class="mt-3 space-y-2">
-                <FileListRow
-                  v-for="f in accountFileList" :key="f.zone"
-                  :name="f.file.name" :status="f.label" :ok="true"
-                  @remove="zoneFiles.balance = null" />
-              </ul>
-            </div>
-          </template>
-
+          <FileDropZone
+            accept=".csv,.tsv,.txt,text/csv,text/plain,text/tab-separated-values,application/vnd.ms-excel"
+            hint="Position, Cash, Account Balance History — any combination"
+            @files="onFiles" />
+          <ul v-if="fileList.length" class="space-y-2">
+            <FileListRow
+              v-for="f in fileList" :key="f.zone"
+              :name="f.file.name" :status="f.label" :ok="true"
+              @remove="zoneFiles[f.zone] = null" />
+          </ul>
+          <ul class="text-2xs text-ink-faint space-y-1 leading-relaxed">
+            <li><span class="text-ink-muted">Position History</span> — adds your trades, with fees from any Cash History you've imported.</li>
+            <li><span class="text-ink-muted">Cash History</span> — deposits &amp; withdrawals, and fees on trades you already have. Never adds trades.</li>
+            <li><span class="text-ink-muted">Account Balance History</span> — sets your starting balance.</li>
+          </ul>
         </div>
 
         <div class="px-5 py-4 border-t border-border flex gap-3 flex-shrink-0">
           <button class="btn btn-ghost btn-sm flex-1" @click="closeModal">Cancel</button>
           <button
             class="btn btn-primary btn-sm flex-1"
-            :disabled="activeTab === 'trade' ? !zoneFiles.position : !zoneFiles.balance"
+            :disabled="!fileList.length"
             @click="runImport">
             Import
           </button>
@@ -91,7 +55,8 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { parseCSV, parseDualCSV, parseRows, detectCSVFormat, parseBalanceHistory } from '@/lib/csvParser'
+import { parseCSV, parseRows, detectCSVFormat, parseBalanceHistory } from '@/lib/csvParser'
+import { buildTradeImport } from '@/lib/tradeImport'
 import { useTradesStore } from '@/stores/trades'
 import { useBalanceStore } from '@/stores/balance'
 import { useCashEventsStore } from '@/stores/cashEvents'
@@ -110,178 +75,154 @@ const rawCsvArchive = useRawCsvArchiveStore()
 const toast = useToast()
 const { confirm: $confirm } = useConfirm()
 
-// modal = { open, activeTab: 'trade' | 'account', zoneFiles: { position, cash, balance } }
+// zoneFiles: the one file of each kind waiting to be imported.
 const modalOpen = ref(false)
-const activeTab = ref('trade')
 const zoneFiles = ref({ position: null, cash: null, balance: null })
 
-function openPicker() {
-  activeTab.value = 'trade'
-  zoneFiles.value = { position: null, cash: null, balance: null }
+// prefill: { position?, cash?, balance? } files (not a click event, which
+// the slot's `trigger` passes when used straight as a handler).
+function openPicker(prefill) {
+  const files = prefill instanceof Event ? {} : prefill || {}
+  zoneFiles.value = { position: null, cash: null, balance: null, ...files }
   modalOpen.value = true
 }
 function closeModal() { modalOpen.value = false }
 
-// Trade tab: one drop zone takes Position History and/or Cash History
-// together — each dropped/picked file is classified by its own content
-// (detectCSVFormat), not by which box it landed in, so there's nothing
-// to get wrong about which file goes where.
-async function onTradeFiles(files) {
+const KINDS = ['position', 'cash', 'balance']
+const LABELS = { position: 'Position History', cash: 'Cash History', balance: 'Account Balance History' }
+
+// Each dropped/picked file is classified by its own content
+// (detectCSVFormat), so there's nothing to get wrong about which is which.
+async function onFiles(files) {
   for (const file of files) {
     const fmt = detectCSVFormat(await file.text())
-    if (fmt === 'position') zoneFiles.value.position = file
-    else if (fmt === 'cash') zoneFiles.value.cash = file
-    else toast.error(`${file.name} doesn't look like a Position or Cash History file`)
+    if (KINDS.includes(fmt)) zoneFiles.value[fmt] = file
+    else toast.error(`${file.name} doesn't look like a Position, Cash or Account Balance History file`)
   }
 }
 
-// Account tab: single Account Balance History file.
-async function onBalanceFiles(files) {
-  for (const file of files) {
-    const fmt = detectCSVFormat(await file.text())
-    if (fmt === 'balance') zoneFiles.value.balance = file
-    else toast.error(`${file.name} doesn't look like an Account Balance History file`)
-  }
-}
-
-const tradeFileList = computed(() => {
-  const list = []
-  if (zoneFiles.value.position) list.push({ zone: 'position', file: zoneFiles.value.position, label: 'Position History' })
-  if (zoneFiles.value.cash) list.push({ zone: 'cash', file: zoneFiles.value.cash, label: 'Cash History (fees)' })
-  return list
-})
-const accountFileList = computed(() => {
-  return zoneFiles.value.balance
-    ? [{ zone: 'balance', file: zoneFiles.value.balance, label: 'Account Balance History' }]
-    : []
-})
+const fileList = computed(() =>
+  KINDS.filter(k => zoneFiles.value[k]).map(k => ({ zone: k, file: zoneFiles.value[k], label: LABELS[k] })))
 
 async function runImport() {
-  if (activeTab.value === 'account') {
-    if (!zoneFiles.value.balance) return
-    const balanceFile = zoneFiles.value.balance
-    modalOpen.value = false
-    await runBalance(balanceFile)
-    return
-  }
-
-  if (!zoneFiles.value.position) return
-  const posFile  = zoneFiles.value.position
-  const cashFile = zoneFiles.value.cash
+  if (!fileList.value.length) return
+  const files = { ...zoneFiles.value }
   modalOpen.value = false
-
-  if (cashFile) {
-    await runDual(posFile, cashFile)
-  } else {
-    await runSingle(await posFile.text())
-  }
+  await importFiles(files)
 }
 
-// Parses an Account Balance History file and, after the person confirms the
-// computed starting balance and effective date, sets it up for tracking.
-// Guards against importing a file with the right shape but wrong data (e.g.
-// the wrong account) by always showing the computed numbers before committing.
-async function runBalance(file) {
-  try {
-    const text = await file.text()
-    const { rawStarting, earliestBalanceDate, errors } = parseBalanceHistory(text)
-    if (errors.length) { toast.error(errors.join('; ')); return }
+const plural = (n, word) => `${n} ${word}${n !== 1 ? 's' : ''}`
 
-    const dateLabel = earliestBalanceDate || 'unknown date'
-    const ok = await $confirm({
-      title: 'Set Starting Balance',
-      message: `Set starting balance to $${rawStarting.toFixed(2)}, effective ${dateLabel}?`,
-      confirmLabel: 'Set Balance',
-    })
+// Imports any mix of the three files behind one confirm step. What a
+// Position-only or Cash-only import does is worked out by lib/tradeImport.js.
+async function importFiles({ position, cash, balance }) {
+  try {
+    const [posText, cashText, balText] = await Promise.all([position, cash, balance].map(f => (f ? f.text() : null)))
+
+    // Account Balance History: the computed numbers are always shown before
+    // committing, so a right-shaped file for the wrong account is caught.
+    let bal = null
+    if (balText) {
+      bal = parseBalanceHistory(balText)
+      if (bal.errors.length) { toast.error(bal.errors.join('; ')); return }
+    }
+
+    let plan = null
+    if (posText || cashText) {
+      // Fees come from the rows earlier imports saved — make sure they're here.
+      if (!rawCsvArchive.loaded) await rawCsvArchive.load()
+      plan = buildTradeImport({
+        positionText: posText, cashText,
+        savedPosition: rawCsvArchive.data.position, savedCash: rawCsvArchive.data.cash,
+        existingTrades: tradesStore.trades,
+      })
+      if (plan.errors.length) { toast.warn(plan.errors.join('; ')); return }
+      if (posText && !plan.newTradeCount) { toast.error('No valid trades found'); return }
+      // Surface structural issues before the confirm dialog, not after.
+      for (const w of plan.warnings) toast.warn(w)
+    }
+
+    const adds = []
+    if (plan?.newTradeCount) adds.push(plural(plan.newTradeCount, 'trade'))
+    if (plan?.fundTransactions.length) adds.push(plural(plan.fundTransactions.length, 'fund transaction'))
+    const lines = []
+    if (adds.length) lines.push(`This will add ${adds.join(' and ')} to your journal.`)
+    if (plan?.refreshCount) lines.push('Fees on matching trades you already have will be updated.')
+    if (cashText && !lines.length) lines.push('This will update your cash history.')
+    if (bal) lines.push(`Starting balance will be set to $${bal.rawStarting.toFixed(2)}, effective ${bal.earliestBalanceDate || 'unknown date'}.`)
+
+    const ok = await $confirm({ title: 'Import CSV', message: lines.join(' '), confirmLabel: 'Import' })
     if (!ok) return
 
-    // Everything from here on writes to Supabase (setStartingBalance,
-    // rawCsvArchive.mergeRows), which didn't used to be true when this was
-    // all localStorage — a loading toast is the only sign anything's
-    // happening until it resolves.
-    const loadingId = toast.loading('Setting starting balance…')
+    // Everything from here on writes to Supabase — the loading toast is the
+    // only sign anything's happening until it resolves.
+    const loadingId = toast.loading('Importing…')
     try {
-      await balanceStore.setStartingBalance(rawStarting, earliestBalanceDate)
-      // Archive the original rows so the Export page can produce a re-importable file
-      const balRows = parseRows(text)
-      if (balRows.length) await rawCsvArchive.mergeRows('balance', Object.keys(balRows[0]), balRows)
-      toast.success(`Starting balance set to $${rawStarting.toFixed(2)}`)
+      if (bal) {
+        await balanceStore.setStartingBalance(bal.rawStarting, bal.earliestBalanceDate)
+        // Archive the original rows so the Export page can produce a re-importable file
+        const balRows = parseRows(balText)
+        if (balRows.length) await rawCsvArchive.mergeRows('balance', Object.keys(balRows[0]), balRows)
+        toast.success(`Starting balance set to $${bal.rawStarting.toFixed(2)}`)
+      }
+      if (!plan) return
+
+      if (plan.fundTransactions.length) {
+        const added = await balanceStore.mergeTransactions(plan.fundTransactions)
+        if (added > 0) toast.info(`${plural(added, 'fund transaction')} recorded`)
+      }
+      // Raw cash events for drawdown/peak equity calculation
+      if (plan.cashEvents.length) await cashEventsStore.mergeEvents(plan.cashEvents)
+      // Archive the original, untouched CSV rows (exact broker columns): later
+      // imports take fees from them, and an Export page download of them
+      // re-imports the same way this file did.
+      if (posText) {
+        const posRows = parseRows(posText)
+        if (posRows.length) await rawCsvArchive.mergeRows('position', Object.keys(posRows[0]), posRows)
+      }
+      if (cashText) {
+        const cashRows = parseRows(cashText)
+        if (cashRows.length) await rawCsvArchive.mergeRows('cash', Object.keys(cashRows[0]), cashRows)
+      }
+
+      const result = plan.trades.length
+        ? await tradesStore.insertTrades(plan.trades)
+        : { inserted: 0, updated: 0, skipped: 0 }
+      if (posText) {
+        reportTrades(result)
+      } else {
+        toast.success(result.updated > 0
+          ? `Cash History imported — fees updated on ${plural(result.updated, 'trade')}`
+          : 'Cash History imported')
+        emit('done', result)
+      }
     } finally {
       toast.dismiss(loadingId)
     }
   } catch (e) {
-    toast.error('Failed to parse balance file: ' + e.message)
+    toast.error('Import failed: ' + e.message)
   }
 }
 
 // ── primary entry point (drag-drop onto a page, e.g. TradesView) ──────────────
+// Broker files open the modal with them filled in, so more can be added;
+// a Performance / unrecognised file imports straight away.
 async function handleFiles(files) {
   if (!files.length) return
+  const labeled = await Promise.all(files.map(async f => {
+    const text = await f.text()
+    return { file: f, text, fmt: detectCSVFormat(text) }
+  }))
 
-  if (files.length === 1) {
-    await handleSingleFile(files[0])
-    return
-  }
+  const prefill = {}
+  for (const l of labeled) if (KINDS.includes(l.fmt) && !prefill[l.fmt]) prefill[l.fmt] = l.file
+  if (Object.keys(prefill).length) { openPicker(prefill); return }
 
-  // Multiple files — try to pair them
-  const labeled = await Promise.all(files.map(async f => ({ file: f, fmt: detectCSVFormat(await f.text()) })))
-  const position = labeled.find(l => l.fmt === 'position')
-  const cash     = labeled.find(l => l.fmt === 'cash')
-  const balance  = labeled.find(l => l.fmt === 'balance')
-  const perf     = labeled.find(l => l.fmt === 'performance')
-
-  if (position && cash) {
-    await runDual(position.file, cash.file)
-  } else if (perf) {
-    await runSingle(await perf.file.text())
-  } else if (position) {
-    await runSingle(await position.file.text())
-  } else if (balance) {
-    // Balance alone imports on its own — open the Account tab with it pre-filled.
-    activeTab.value = 'account'
-    zoneFiles.value = { position: null, cash: null, balance: balance.file }
-    modalOpen.value = true
-  } else if (cash) {
-    // Cash alone can't be imported — open the modal with Cash pre-filled so
-    // they can drop the matching Position History file in (which is required).
-    activeTab.value = 'trade'
-    zoneFiles.value = { position: null, cash: cash.file, balance: null }
-    modalOpen.value = true
-    toast.info('Add the matching Position History file to import')
-  } else {
-    // Generic: just try first file
-    await runSingle(await files[0].text())
-  }
+  const perf = labeled.find(l => l.fmt === 'performance')
+  await runSingle((perf || labeled[0]).text)
 }
 
-async function handleSingleFile(file) {
-  const text = await file.text()
-  const fmt  = detectCSVFormat(text)
-
-  if (fmt === 'performance' || fmt === 'unknown') {
-    await runSingle(text)
-    return
-  }
-
-  // Balance imports entirely on its own — open straight to the Account tab.
-  if (fmt === 'balance') {
-    activeTab.value = 'account'
-    zoneFiles.value = { position: null, cash: null, balance: file }
-    modalOpen.value = true
-    return
-  }
-
-  // Position/Cash need a partner — open the Trade tab with the loaded file pre-filled
-  activeTab.value = 'trade'
-  if (fmt === 'position') {
-    zoneFiles.value = { position: file, cash: null, balance: null }
-  } else if (fmt === 'cash') {
-    zoneFiles.value = { position: null, cash: file, balance: null }
-  }
-  modalOpen.value = true
-}
-
-// ── core runners ─────────────────────────────────────────────────────────────
+// ── Performance.csv / generic files ──────────────────────────────────────────
 async function runSingle(text) {
   try {
     const { trades, errors, warnings } = parseCSV(text)
@@ -294,14 +235,14 @@ async function runSingle(text) {
 
     const ok = await $confirm({
       title: 'Import CSV',
-      message: `This will add ${trades.length} trade${trades.length !== 1 ? 's' : ''} to your journal.`,
+      message: `This will add ${plural(trades.length, 'trade')} to your journal.`,
       confirmLabel: 'Import',
     })
     if (!ok) return
 
-    const loadingId = toast.loading(`Importing ${trades.length} trade${trades.length !== 1 ? 's' : ''}…`)
+    const loadingId = toast.loading(`Importing ${plural(trades.length, 'trade')}…`)
     try {
-      await finish(trades)
+      reportTrades(await tradesStore.insertTrades(trades))
     } finally {
       toast.dismiss(loadingId)
     }
@@ -310,52 +251,8 @@ async function runSingle(text) {
   }
 }
 
-async function runDual(posFile, cashFile) {
-  try {
-    const [posText, cashText] = await Promise.all([posFile.text(), cashFile.text()])
-    const { trades, fundTransactions, cashEvents, errors, warnings } = parseDualCSV(posText, cashText)
-    if (errors.length) { toast.warn(errors.join('; ')); return }
-    if (!trades.length) { toast.error('No valid trades found'); return }
-    for (const w of warnings) toast.warn(w)
-
-    const parts = [`${trades.length} trade${trades.length !== 1 ? 's' : ''}`]
-    if (fundTransactions.length) parts.push(`${fundTransactions.length} fund transaction${fundTransactions.length !== 1 ? 's' : ''}`)
-    const ok = await $confirm({
-      title: 'Import CSV',
-      message: `This will add ${parts.join(' and ')} to your journal.`,
-      confirmLabel: 'Import',
-    })
-    if (!ok) return
-
-    const loadingId = toast.loading(`Importing ${parts.join(' and ')}…`)
-    try {
-      // Auto-merge fund transactions
-      if (fundTransactions.length) {
-        const added = await balanceStore.mergeTransactions(fundTransactions)
-        if (added > 0) toast.info(`${added} fund transaction${added !== 1 ? 's' : ''} recorded`)
-      }
-      // Merge raw cash events for drawdown/peak equity calculation
-      if (cashEvents.length) {
-        await cashEventsStore.mergeEvents(cashEvents)
-      }
-      // Archive the original, untouched CSV rows (exact broker columns) so a
-      // later Export page download can be re-imported the same way this file was.
-      const posRows = parseRows(posText)
-      if (posRows.length) await rawCsvArchive.mergeRows('position', Object.keys(posRows[0]), posRows)
-      const cashRows = parseRows(cashText)
-      if (cashRows.length) await rawCsvArchive.mergeRows('cash', Object.keys(cashRows[0]), cashRows)
-      await finish(trades)
-    } finally {
-      toast.dismiss(loadingId)
-    }
-  } catch (e) {
-    toast.error('Import failed: ' + e.message)
-  }
-}
-
-async function finish(trades) {
-  const { inserted, updated, skipped } = await tradesStore.insertTrades(trades)
-  let msg = `Imported ${inserted} trade${inserted !== 1 ? 's' : ''}`
+function reportTrades({ inserted, updated, skipped }) {
+  let msg = `Imported ${plural(inserted, 'trade')}`
   const extras = []
   if (updated > 0) extras.push(`${updated} updated`)
   if (skipped > 0) extras.push(`${skipped} unchanged`)

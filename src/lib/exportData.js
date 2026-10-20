@@ -8,6 +8,7 @@
 
 import { startOfWeek, addDays, format } from 'date-fns'
 import { useRawCsvArchiveStore } from '@/stores/rawCsvArchive'
+import { toCsv } from '@/lib/csvParser'
 import { useJournalStore, DEFAULT_CHECKLIST } from '@/stores/journal'
 import { useHolidayStore } from '@/stores/holidays'
 import { useTimezoneStore } from '@/stores/timezone'
@@ -80,16 +81,6 @@ function dateOfKey(key, holidayStore) {
   return null
 }
 
-function csvCell(v) {
-  if (v === null || v === undefined) return ''
-  return JSON.stringify(String(v))
-}
-
-function toCsv(headers, rows) {
-  const lines = [headers.join(',')]
-  for (const row of rows) lines.push(headers.map(h => csvCell(row[h])).join(','))
-  return lines.join('\n')
-}
 
 // `.toISOString()` reports the UTC date, which rolls to tomorrow's date for
 // anyone west of UTC in the evening — use the app's own timezone setting

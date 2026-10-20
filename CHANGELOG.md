@@ -3,6 +3,15 @@
 ## Unreleased
 
 ### Changed
+- **Import CSV** is one drop zone for any mix of Position History, Cash
+  History and Account Balance History (no more Trade / Account tabs), and
+  each file can be imported on its own:
+  - **Cash History alone** (e.g. after a withdrawal) records deposits and
+    withdrawals and the cash history, and fills in fees on trades you already
+    have. It never adds trades.
+  - **Position History alone** takes fees from the Cash History you've
+    already imported, and never replaces a trade's fees with $0.
+  - Importing both together works as before.
 - Dashboard **Max Drawdown** card follows the Equity / Balance chart's range
   tab (1W / 1M / 3M / YTD / ALL) instead of always being all-time, and its
   title shows the tab (e.g. "Max Drawdown · 1M"). Without Cash History it
