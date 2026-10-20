@@ -189,7 +189,7 @@
                     <td class="font-mono font-semibold text-ink">
                       <span class="inline-flex items-center gap-1.5">
                         {{ t.symbol }}
-                        <TooltipWrap v-if="hasNote(t)" :tip="notePreview(t.notes)">
+                        <TooltipWrap v-if="hasNote(liveTrade(t))" :tip="noteTooltip(liveTrade(t))">
                           <svg class="w-3.5 h-3.5 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-label="Has note">
                           <path stroke-linecap="round" stroke-linejoin="round" d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9l-6-6z"/><path stroke-linecap="round" stroke-linejoin="round" d="M14 3v6h6M8 13h8M8 17h5"/>
                         </svg>
@@ -430,7 +430,7 @@ import { useCheckin } from '@/composables/useCheckin'
 import draggable from 'vuedraggable'
 import CompactValue from '@/components/ui/CompactValue.vue'
 import TradeDrawer from '@/components/logs/TradeDrawer.vue'
-import { hasNote, notePreview } from '@/lib/tradeNotes'
+import { hasNote, noteTooltip, hasContent } from '@/lib/tradeNotes'
 
 const tradesStore     = useTradesStore()
 const journalStore    = useJournalStore()
@@ -714,6 +714,12 @@ function clearQuarterFilter() {
 const totalPages  = computed(() => Math.ceil(currentEntries.value.length / PAGE_SIZE.value))
 const pagedEntries = computed(() => currentEntries.value.slice(page.value * PAGE_SIZE.value, (page.value + 1) * PAGE_SIZE.value))
 
+// The entry's trades are a snapshot that deliberately ignores note / chart
+// image edits (see tradesFingerprint) — the note icon reads the live trade
+// instead, so it appears as soon as a note or image is added.
+const liveTradesById = computed(() => new Map(tradesStore.trades.map(t => [t.id, t])))
+const liveTrade = t => liveTradesById.value.get(t.id) || t
+
 const pagedTrades = computed(() => {
   if (!selected.value) return []
   const sorted = [...selected.value.trades].sort((a, b) => new Date(b.sold_at) - new Date(a.sold_at))
@@ -893,7 +899,17 @@ function persistEntry() {
   journalStore.setSections(selected.value.key, selected.value.sections)
 }
 
-function removeSection(id) {
+// Asks first when the section has writing in it — one click on "Remove"
+// used to throw it away for good. An empty section goes straight away.
+async function removeSection(id) {
+  if (!selected.value) return
+  const section = selected.value.sections.find(s => s.id === id)
+  if (section && hasContent(section.content) && !await $confirm({
+    title: `Remove "${section.title}"?`,
+    message: 'What you wrote in this section will be permanently deleted and cannot be restored.',
+    confirmLabel: 'Remove',
+    danger: true,
+  })) return
   if (!selected.value) return
   selected.value.sections = selected.value.sections.filter(s => s.id !== id)
   persistEntry()

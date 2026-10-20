@@ -144,7 +144,7 @@
               <td class="font-mono font-semibold text-ink">
                 <span class="inline-flex items-center gap-1.5">
                   {{ t.symbol }}
-                  <TooltipWrap v-if="hasNote(t)" :tip="notePreview(t.notes)">
+                  <TooltipWrap v-if="hasNote(t)" :tip="noteTooltip(t)">
                     <svg class="w-3.5 h-3.5 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-label="Has note">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9l-6-6z"/><path stroke-linecap="round" stroke-linejoin="round" d="M14 3v6h6M8 13h8M8 17h5"/>
                   </svg>
@@ -220,7 +220,7 @@ import { useCashEventsStore } from '@/stores/cashEvents'
 import { useTimezoneStore } from '@/stores/timezone'
 import { useToast }        from '@/composables/useToast'
 import { fmt, fmtPct, computeStats } from '@/lib/stats'
-import { hasNote, notePreview } from '@/lib/tradeNotes'
+import { hasNote, noteTooltip } from '@/lib/tradeNotes'
 import { format, parseISO } from 'date-fns'
 import CsvImport         from '@/components/ui/CsvImport.vue'
 import DatePickerCalendar from '@/components/ui/DatePickerCalendar.vue'

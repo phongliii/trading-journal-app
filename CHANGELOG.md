@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Changed
+- The trade **note icon** and the **Has note** filter also count a chart
+  image: a trade with only a chart image now shows the icon (hover says
+  "Chart image"; with text too it adds "(+ chart image)").
+
+### Fixed
+- Journal: **Remove** on a note section deleted it — and everything written
+  in it — with one click. It now asks first when the section has content;
+  an empty section is still removed straight away.
+- Journal: the note icon in the day's trade list didn't appear for a note or
+  chart image added while the page was open, until a page refresh.
+
 ## 2.2.0 — 2026-10-20
 
 ### Added

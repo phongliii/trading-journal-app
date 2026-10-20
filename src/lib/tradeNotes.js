@@ -14,12 +14,26 @@ export function noteText(html) {
     .split('\n').map(l => l.trim()).filter(Boolean).join('\n')
 }
 
+// Editor HTML with anything in it: text, or a pasted image.
+export function hasContent(html) {
+  return noteText(html) !== '' || /<img\b/i.test(html || '')
+}
+
+// A trade "has a note" when its note has content or it has a chart image.
 export function hasNote(trade) {
-  return noteText(trade?.notes) !== ''
+  return hasContent(trade?.notes) || !!trade?.chartImage
 }
 
 // First line of the note, shortened to `max` characters — for hover previews.
 export function notePreview(html, max = 80) {
   const first = noteText(html).split('\n')[0] || ''
   return first.length > max ? first.slice(0, max - 1).trimEnd() + '…' : first
+}
+
+// Hover text for a trade's note icon: the note's first line, and/or that
+// there's a chart image.
+export function noteTooltip(trade) {
+  const text = notePreview(trade?.notes)
+  if (!trade?.chartImage) return text
+  return text ? `${text} (+ chart image)` : 'Chart image'
 }
