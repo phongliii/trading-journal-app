@@ -186,7 +186,16 @@
                 </thead>
                 <tbody>
                   <tr v-for="t in pagedTrades" :key="t.id" @click="openTrade(t)" class="cursor-pointer">
-                    <td class="font-mono font-semibold text-ink">{{ t.symbol }}</td>
+                    <td class="font-mono font-semibold text-ink">
+                      <span class="inline-flex items-center gap-1.5">
+                        {{ t.symbol }}
+                        <TooltipWrap v-if="hasNote(t)" :tip="notePreview(t.notes)">
+                          <svg class="w-3.5 h-3.5 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-label="Has note">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9l-6-6z"/><path stroke-linecap="round" stroke-linejoin="round" d="M14 3v6h6M8 13h8M8 17h5"/>
+                        </svg>
+                        </TooltipWrap>
+                      </span>
+                    </td>
                     <td>
                       <span class="badge-neutral" v-if="!t.side || t.side === 'long'">Long</span>
                       <span class="badge-down" v-else>Short</span>
@@ -421,6 +430,7 @@ import { useCheckin } from '@/composables/useCheckin'
 import draggable from 'vuedraggable'
 import CompactValue from '@/components/ui/CompactValue.vue'
 import TradeDrawer from '@/components/logs/TradeDrawer.vue'
+import { hasNote, notePreview } from '@/lib/tradeNotes'
 
 const tradesStore     = useTradesStore()
 const journalStore    = useJournalStore()
