@@ -18,17 +18,17 @@ import { useToast } from '@/composables/useToast'
 
 const { toasts } = useToast()
 
+// One look per outcome: ✓ done, ⚠ heads-up (something skipped or worth
+// acting on), ✕ failed.
 const styles = {
   success: 'bg-surface-2 border-brand/30',
   error:   'bg-surface-2 border-down/30',
-  info:    'bg-surface-2 border-border',
   warn:    'bg-surface-2 border-warn/30',
   loading: 'bg-surface-2 border-border',
 }
 const icons = {
   success: '✓',
   error:   '✕',
-  info:    'ℹ',
   warn:    '⚠',
 }
 </script>

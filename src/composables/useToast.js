@@ -23,7 +23,6 @@ export function useToast() {
     toasts,
     success: (msg) => push(msg, 'success'),
     error:   (msg) => push(msg, 'error'),
-    info:    (msg) => push(msg, 'info'),
     warn:    (msg) => push(msg, 'warn'),
     // Returns the toast's id — callers hang onto it and call dismiss(id)
     // once the work it was tracking finishes (CSV imports now write
