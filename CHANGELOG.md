@@ -5,7 +5,8 @@
 ### Changed
 - Messages use one icon per outcome: ✓ for anything done (fund transactions
   recorded, trades imported, data cleared — no more separate ℹ style), ⚠ for
-  a heads-up, ✕ for a failure. Import files that can't be read now show as
+  a heads-up, ✕ for a failure — each icon coloured to match (green, amber,
+  red). Import files that can't be read now show as
   failures (✕) instead of warnings.
 - **Loading cover** for long actions: importing, restoring Journal Data,
   Reset Everything, deleting all/many trades, clearing chart images,
