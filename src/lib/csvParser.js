@@ -91,6 +91,14 @@ function splitLine(line, delim) {
   return result
 }
 
+// Rows (objects keyed by header) back into CSV text that parseRows reads.
+export function toCsv(headers, rows) {
+  const cell = v => (v === null || v === undefined ? '' : JSON.stringify(String(v)))
+  const lines = [headers.join(',')]
+  for (const row of rows) lines.push(headers.map(h => cell(row[h])).join(','))
+  return lines.join('\n')
+}
+
 export function parseRows(text) {
   const lines = text.trim().split(/\r?\n/)
   if (lines.length < 2) return []
@@ -303,17 +311,20 @@ export function parseDualCSV(positionText, cashText) {
   const blankRows = posRows.length - cleanPosRows.length
   if (blankRows > 0) warnings.push(`Skipped ${blankRows} blank/unreadable row${blankRows !== 1 ? 's' : ''}`)
 
-  const { feeByTxnId, perContractRate } = parseCashHistory(cashText)
-  if (!feeByTxnId.size) {
+  // No Cash History at all (a Position-only import with nothing saved to
+  // take fees from) → trades with $0 fees. A Cash file WITH no fee rows is
+  // still rejected — that's the wrong file, not a missing one.
+  const { feeByTxnId, perContractRate } = cashText ? parseCashHistory(cashText) : { feeByTxnId: new Map(), perContractRate: 0 }
+  if (cashText && !feeByTxnId.size) {
     errors.push('Cash_History.csv is empty or no fee rows found')
     return { trades: [], fundTransactions: [], cashEvents: [], errors, warnings }
   }
 
   // Extract fund transactions automatically
-  const fundTransactions = parseFundTransactions(cashText)
+  const fundTransactions = cashText ? parseFundTransactions(cashText) : []
 
   // Extract raw chronological cash events for drawdown/peak equity
-  const cashEvents = parseCashEvents(cashText)
+  const cashEvents = cashText ? parseCashEvents(cashText) : []
 
   // Pre-compute total Paired Qty per fill ID (for proportional splitting)
   const fillTotalQty = new Map()

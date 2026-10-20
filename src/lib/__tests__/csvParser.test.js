@@ -174,6 +174,13 @@ describe('parseDualCSV (Position_History + Cash_History)', () => {
     expect(parseDualCSV(csv('foo,bar', '1,2'), CASH).errors).toHaveLength(1)
   })
 
+  it('runs without a cash file (fees $0)', () => {
+    const r = parseDualCSV(POSITION, '')
+    expect(r.errors).toEqual([])
+    expect(r.trades.every(t => t.fees === 0)).toBe(true)
+    expect(r.fundTransactions).toEqual([])
+  })
+
   it('errors when the cash file has no fee rows', () => {
     const cashNoFees = csv('Transaction ID,Timestamp,Delta,Cash Change Type', '1,10/05/2026 09:00:00,5,Trade Paired')
     expect(parseDualCSV(POSITION, cashNoFees).errors).toEqual(['Cash_History.csv is empty or no fee rows found'])
