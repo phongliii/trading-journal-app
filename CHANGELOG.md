@@ -5,7 +5,8 @@
 ### Changed
 - Messages use one icon per outcome: ✓ for anything done (fund transactions
   recorded, trades imported, data cleared — no more separate ℹ style), ⚠ for
-  a heads-up, ✕ for a failure. Import files that can't be read now show as
+  a heads-up, ✕ for a failure — each icon coloured to match (green, amber,
+  red). Import files that can't be read now show as
   failures (✕) instead of warnings.
 - **Loading cover** for long actions: importing, restoring Journal Data,
   Reset Everything, deleting all/many trades, clearing chart images,
@@ -57,6 +58,11 @@
 - The unused Analytics page (it had no route or menu link).
 
 ### Added
+- **See which trades have a note.** Trades with a note show a note icon
+  next to the symbol (Trades page and the Journal's trade list); hovering
+  it shows the note's first line. The Trades page has a **Has note** filter
+  that works together with Wins / Losses / Breakeven. An emptied note
+  doesn't count.
 - Journal: the day's trade table has **Time** (open → close) and **Duration**
   columns, like the Trades page. Weekly and monthly tables also show the date.
 - **"Target reached!" pop-up** when the Account Balance crosses from below the

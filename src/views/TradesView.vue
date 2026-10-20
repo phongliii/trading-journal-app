@@ -39,6 +39,17 @@
           :class="outcome === f.val ? '!border-border-strong !text-ink !bg-surface-3' : ''">
           {{ f.label }}
         </button>
+        <!-- Works together with the outcome buttons (e.g. Losses + Has note) -->
+        <button
+          class="btn btn-ghost btn-sm whitespace-nowrap inline-flex items-center gap-1.5"
+          :class="withNote ? '!border-border-strong !text-ink !bg-surface-3' : ''"
+          :aria-pressed="withNote"
+          @click="withNote = !withNote">
+          <svg class="w-3.5 h-3.5" :class="withNote ? 'text-brand' : 'text-ink-muted'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9l-6-6z"/><path stroke-linecap="round" stroke-linejoin="round" d="M14 3v6h6M8 13h8M8 17h5"/>
+          </svg>
+          Has note
+        </button>
       </div>
 
       <div class="flex items-center gap-2 flex-wrap sm:ml-auto">
@@ -130,7 +141,16 @@
             </tr>
             <tr v-for="(t, i) in paginated" :key="t.id || i" @click="openDetail(t)" class="cursor-pointer">
               <td class="text-ink-faint font-mono text-2xs">{{ (page - 1) * perPage + i + 1 }}</td>
-              <td class="font-mono font-semibold text-ink">{{ t.symbol }}</td>
+              <td class="font-mono font-semibold text-ink">
+                <span class="inline-flex items-center gap-1.5">
+                  {{ t.symbol }}
+                  <TooltipWrap v-if="hasNote(t)" :tip="notePreview(t.notes)">
+                    <svg class="w-3.5 h-3.5 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-label="Has note">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9l-6-6z"/><path stroke-linecap="round" stroke-linejoin="round" d="M14 3v6h6M8 13h8M8 17h5"/>
+                  </svg>
+                  </TooltipWrap>
+                </span>
+              </td>
               <td>
                 <span class="badge-neutral" v-if="!t.side || t.side === 'long'">Long</span>
                 <span class="badge-down" v-else>Short</span>
@@ -200,6 +220,7 @@ import { useCashEventsStore } from '@/stores/cashEvents'
 import { useTimezoneStore } from '@/stores/timezone'
 import { useToast }        from '@/composables/useToast'
 import { fmt, fmtPct, computeStats } from '@/lib/stats'
+import { hasNote, notePreview } from '@/lib/tradeNotes'
 import { format, parseISO } from 'date-fns'
 import CsvImport         from '@/components/ui/CsvImport.vue'
 import DatePickerCalendar from '@/components/ui/DatePickerCalendar.vue'
@@ -291,12 +312,13 @@ async function confirmClearTrades() {
   toast.success(`Cleared ${count} trade${count !== 1 ? 's' : ''}`)
 }
 const outcome  = ref('all')
+const withNote = ref(false) // "Has note" filter
 const dragOver = ref(false)
 const sortField = ref('sold_at')
 const sortDir   = ref('desc')
 const page      = ref(1)
 
-watch([filterDate, rangeStart, rangeEnd], () => {
+watch([filterDate, rangeStart, rangeEnd, withNote], () => {
   page.value = 1
 })
 const perPage   = 15
@@ -330,6 +352,7 @@ const shown = computed(() => {
   if (outcome.value === 'win')       list = list.filter(t => (t.gross_pnl ?? t.pnl) > 0)
   if (outcome.value === 'loss')      list = list.filter(t => (t.gross_pnl ?? t.pnl) < 0)
   if (outcome.value === 'breakeven') list = list.filter(t => (t.gross_pnl ?? t.pnl) === 0)
+  if (withNote.value) list = list.filter(hasNote)
 
   // Date filter
   if (rangeStart.value && rangeEnd.value) {

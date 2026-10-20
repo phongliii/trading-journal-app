@@ -7,7 +7,7 @@
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/>
         <path class="opacity-75" fill="currentColor" d="M12 2a10 10 0 0 1 10 10h-3a7 7 0 0 0-7-7V2z"/>
       </svg>
-      <span v-else class="text-base leading-none mt-0.5">{{ icons[t.type] }}</span>
+      <span v-else class="text-base leading-none mt-0.5" :class="iconColors[t.type]">{{ icons[t.type] }}</span>
       <span class="text-ink leading-snug">{{ t.msg }}</span>
     </div>
   </div>
@@ -25,6 +25,11 @@ const styles = {
   error:   'bg-surface-2 border-down/30',
   warn:    'bg-surface-2 border-warn/30',
   loading: 'bg-surface-2 border-border',
+}
+const iconColors = {
+  success: 'text-up',
+  error:   'text-down',
+  warn:    'text-warn',
 }
 const icons = {
   success: '✓',
