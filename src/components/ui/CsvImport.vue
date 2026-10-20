@@ -228,6 +228,11 @@ async function runSingle(text) {
 }
 
 function reportTrades({ inserted, updated, skipped }) {
+  if (!inserted && !updated && skipped) {
+    toast.success(`No new trades — ${skipped === 1 ? 'it was' : `all ${skipped} were`} already in your journal`)
+    emit('done', { inserted, updated, skipped })
+    return
+  }
   let msg = `Imported ${plural(inserted, 'trade')}`
   const extras = []
   if (updated > 0) extras.push(`${updated} updated`)
