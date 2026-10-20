@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+## 2.2.0 — 2026-10-20
+
+### Added
+- **See which trades have a note.** Trades with a note show a note icon
+  next to the symbol (Trades page and the Journal's trade list); hovering
+  it shows the note's first line. The Trades page has a **Has note** filter
+  that works together with Wins / Losses / Breakeven. An emptied note
+  doesn't count.
+- Journal: the day's trade table has **Time** (open → close) and **Duration**
+  columns, like the Trades page. Weekly and monthly tables also show the date.
+- **"Target reached!" pop-up** when the Account Balance crosses from below the
+  withdraw target to at or above it (checked on load and right after an
+  import). Shows once per crossing, per portfolio; it re-arms after the
+  balance drops below the target. Needs the withdraw reminder turned on.
+- Journal: **No-trade day** toggle in the daily check-in. Marked days show a
+  "No-trade day" badge on the check-in card instead of the questions, and no
+  longer re-prompt for them. The questions are hidden in the check-in while
+  the toggle is on.
+- Calendar and the Dashboard's weekly calendar show a no-trade day as
+  "No trade" instead of "$0.00 / 0 trades".
+- Calendar and the Dashboard's weekly calendar: every past day is now
+  clickable. Clicking one replaces the cell's content with **Open note** (the
+  day already has a Journal page) or **Create note** (it doesn't), plus
+  **Close**. Week total cells work the same way for the weekly note, and a
+  clicked day from the previous/next month isn't faded while its options show.
+- Unit tests (`npm test`, Vitest) for stats, the Realized P&L buckets and the
+  CSV parsers.
+
 ### Changed
 - Messages use one icon per outcome: ✓ for anything done (fund transactions
   recorded, trades imported, data cleared — no more separate ℹ style), ⚠ for
@@ -53,33 +81,6 @@
   (1W / 1M / 3M / YTD / ALL), like the Realized P&L card. The stat cards
   (Trades, Win Rate, Total P&L, Profit Factor, Max Drawdown), Avg Win / Loss
   and Total Fees are now all-time.
-
-### Removed
-- The unused Analytics page (it had no route or menu link).
-
-### Added
-- **See which trades have a note.** Trades with a note show a note icon
-  next to the symbol (Trades page and the Journal's trade list); hovering
-  it shows the note's first line. The Trades page has a **Has note** filter
-  that works together with Wins / Losses / Breakeven. An emptied note
-  doesn't count.
-- Journal: the day's trade table has **Time** (open → close) and **Duration**
-  columns, like the Trades page. Weekly and monthly tables also show the date.
-- **"Target reached!" pop-up** when the Account Balance crosses from below the
-  withdraw target to at or above it (checked on load and right after an
-  import). Shows once per crossing, per portfolio; it re-arms after the
-  balance drops below the target. Needs the withdraw reminder turned on.
-- Journal: **No-trade day** toggle in the daily check-in. Marked days show a
-  "No-trade day" badge on the check-in card instead of the questions, and no
-  longer re-prompt for them. The questions are hidden in the check-in while
-  the toggle is on.
-- Calendar and the Dashboard's weekly calendar show a no-trade day as
-  "No trade" instead of "$0.00 / 0 trades".
-- Calendar and the Dashboard's weekly calendar: every past day is now
-  clickable. Clicking one replaces the cell's content with **Open note** (the
-  day already has a Journal page) or **Create note** (it doesn't), plus
-  **Close**. Week total cells work the same way for the weekly note, and a
-  clicked day from the previous/next month isn't faded while its options show.
 
 ### Fixed
 - Importing while the Dashboard is open redrew its charts more than needed:
@@ -133,9 +134,8 @@
 - Compact money format with 0 decimals no longer drops integer zeros
   ($150K showed as $15K).
 
-### Added
-- Unit tests (`npm test`, Vitest) for stats, the Realized P&L buckets and the
-  CSV parsers.
+### Removed
+- The unused Analytics page (it had no route or menu link).
 
 ## 2.1.0 — 2026-10-06
 
