@@ -236,8 +236,7 @@ function reportTrades({ inserted, updated, skipped }) {
 }
 
 // expose for drag-drop from parent views
-async function processFile(file)   { await handleFiles([file]) }
 async function processFiles(files) { await handleFiles([...files]) }
 
-defineExpose({ openPicker, processFile, processFiles })
+defineExpose({ openPicker, processFiles })
 </script>
