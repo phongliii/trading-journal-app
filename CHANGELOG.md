@@ -60,6 +60,10 @@
   clicked day from the previous/next month isn't faded while its options show.
 
 ### Fixed
+- Importing while the Dashboard is open redrew its charts more than needed:
+  deposits/withdrawals and cash history now update together (one redraw
+  instead of two), and a Cash file with nothing new no longer changes the
+  balance data at all (no redraw, no re-save).
 - When the **Target reached** popup opened while the cursor was on a chart,
   the chart's hover tooltip stayed drawn on top of the popup and the chart
   kept its hover highlight. Opening the popup now clears both.
