@@ -18,14 +18,19 @@
 </template>
 
 <script setup>
-import { onMounted, onBeforeUnmount } from 'vue'
+import { watch, onMounted, onBeforeUnmount } from 'vue'
 import { fmt } from '@/lib/stats'
+import { hideChartTooltips } from '@/lib/chartTooltip'
 
 // "Target reached" celebration — shown by App.vue when the balance first
 // crosses the withdraw target (see lib/withdrawReminder.js's targetCrossing).
 // target: { balance, amount } while showing, or null.
 const props = defineProps({ target: { type: Object, default: null } })
 const emit = defineEmits(['close'])
+
+// It can pop up while the cursor rests on a chart — clear that chart's
+// tooltip and hover so they don't stay drawn over / behind the popup.
+watch(() => props.target, t => { if (t) hideChartTooltips() })
 
 function onKey(e) { if (e.key === 'Escape' && props.target) emit('close') }
 onMounted(() => window.addEventListener('keydown', onKey))

@@ -48,6 +48,9 @@
   clicked day from the previous/next month isn't faded while its options show.
 
 ### Fixed
+- When the **Target reached** popup opened while the cursor was on a chart,
+  the chart's hover tooltip stayed drawn on top of the popup and the chart
+  kept its hover highlight. Opening the popup now clears both.
 - Two real deposits or withdrawals on the same day for the same amount were
   treated as duplicates on import and only one was kept. They are now told
   apart by the broker's Transaction ID; ones saved earlier without an ID are

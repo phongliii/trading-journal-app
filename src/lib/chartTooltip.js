@@ -7,8 +7,33 @@
 //   const { handler, cleanup } = createExternalTooltip()
 //   ...tooltip: { enabled: false, external: handler }
 //   onBeforeUnmount(cleanup)
+
+// Every live tooltip, so hideChartTooltips() can reach them all.
+const live = new Set()
+
+// Hide every chart tooltip and clear the charts' hover state. For a popup
+// that opens by itself (e.g. "Target reached") while the cursor rests on a
+// chart: the tooltip would otherwise stay drawn on top of it, and the chart
+// would keep its hover until the mouse left the canvas.
+export function hideChartTooltips() {
+  for (const t of live) t.hide()
+}
+
 export function createExternalTooltip() {
   let tooltipEl = null
+  let lastChart = null
+
+  const entry = {
+    hide() {
+      if (tooltipEl) tooltipEl.style.opacity = '0'
+      const chart = lastChart
+      if (!chart?.canvas) return
+      chart.setActiveElements([])
+      chart.tooltip?.setActiveElements([], { x: 0, y: 0 })
+      chart.update('none')
+    },
+  }
+  live.add(entry)
 
   function getOrCreateTooltip() {
     if (tooltipEl) return tooltipEl
@@ -31,6 +56,7 @@ export function createExternalTooltip() {
 
   function handler(context) {
     const { chart, tooltip } = context
+    lastChart = chart
     const el = getOrCreateTooltip()
 
     if (tooltip.opacity === 0) {
@@ -81,6 +107,8 @@ export function createExternalTooltip() {
       tooltipEl.parentNode.removeChild(tooltipEl)
     }
     tooltipEl = null
+    lastChart = null
+    live.delete(entry)
   }
 
   return { handler, cleanup }
