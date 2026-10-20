@@ -39,9 +39,11 @@ function hasFeeRows(text) {
  * @param {{headers,rows}} p.savedPosition  rows saved by earlier imports
  * @param {{headers,rows}} p.savedCash
  * @param {Array} p.existingTrades      trades already in the journal
- * @returns {{ trades, newTradeCount, refreshCount, fundTransactions, cashEvents, errors, warnings }}
- *   trades — what to pass to insertTrades: the new file's trades plus, when
- *   a Cash file came in, existing trades re-derived with the new fees.
+ * @returns {{ trades, fileTradeCount, newTradeCount, updateCount, unchangedCount, refreshCount, fundTransactions, cashEvents, errors, warnings }}
+ *   trades — what to pass to insertTrades: only trades that are new or
+ *   actually change. insertTrades counts (and rewrites) every trade it's
+ *   given as "updated", so unchanged ones are left out here and counted in
+ *   unchangedCount instead.
  */
 export function buildTradeImport({ positionText = null, cashText = null, savedPosition, savedCash, existingTrades = [] }) {
   const errors = [], warnings = []
@@ -77,18 +79,42 @@ export function buildTradeImport({ positionText = null, cashText = null, savedPo
 
   // Never replace fees a trade already has with $0 — that only means no
   // fee rows were available this time, not that the trade had none.
-  const trades = [...fileTrades, ...refreshed].map(t => {
+  const keepFees = t => {
     const old = byBrokerId.get(String(t.broker_id))
     if (!old || t.fees > 0 || !(old.fees > 0)) return t
     const net = Math.round((t.gross_pnl - old.fees) * 100) / 100
     return { ...t, fees: old.fees, net_pnl: net, pnl: net }
-  })
+  }
+
+  // Split the file's trades into new, changed and unchanged.
+  const added = [], changed = []
+  let unchangedCount = 0
+  for (const t of fileTrades.map(keepFees)) {
+    const old = t.broker_id ? byBrokerId.get(String(t.broker_id)) : null
+    if (!old) added.push(t)
+    else if (sameImportFields(old, t)) unchangedCount++
+    else changed.push(t)
+  }
 
   return {
-    trades,
-    newTradeCount: fileTrades.length,
+    trades: [...added, ...changed, ...refreshed],
+    fileTradeCount: fileTrades.length,
+    newTradeCount: added.length,
+    updateCount: changed.length,
+    unchangedCount,
     refreshCount: refreshed.length,
     fundTransactions, cashEvents, errors, warnings,
   }
 }
 
+
+// Same values in every field an import sets (what insertTrades would
+// rewrite). Lenient on format: the cloud can hand numbers back as strings
+// and timestamps with a zone suffix.
+const NUM_FIELDS = ['qty', 'buy_price', 'sell_price', 'gross_pnl', 'fees', 'pnl']
+const TIME_FIELDS = ['bought_at', 'sold_at']
+function sameImportFields(old, t) {
+  if (old.symbol !== t.symbol || old.side !== t.side) return false
+  if (NUM_FIELDS.some(f => Math.abs(Number(old[f] || 0) - Number(t[f] || 0)) >= 0.005)) return false
+  return TIME_FIELDS.every(f => String(old[f] || '').slice(0, 19) === String(t[f] || '').slice(0, 19))
+}

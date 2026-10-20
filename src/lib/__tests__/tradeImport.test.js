@@ -47,6 +47,22 @@ describe('buildTradeImport', () => {
     expect(r.trades[0]).toMatchObject({ fees: 1.6, net_pnl: 8.4, pnl: 8.4 })
   })
 
+  it('Position re-import: leaves out trades already saved with the same values', () => {
+    const first = buildTradeImport({ positionText: POSITION, savedPosition: empty, savedCash: saved(CASH_FEES) }).trades
+    // As the cloud hands them back: numbers as strings, timestamps with a zone.
+    const existing = first.map(t => ({ ...t, id: 'x', fees: String(t.fees), sold_at: t.sold_at + '+00:00' }))
+    const r = buildTradeImport({ positionText: POSITION, savedPosition: empty, savedCash: saved(CASH_FEES), existingTrades: existing })
+    expect(r.trades).toEqual([])
+    expect(r).toMatchObject({ fileTradeCount: 1, newTradeCount: 0, updateCount: 0, unchangedCount: 1 })
+  })
+
+  it('Position re-import: sends a saved trade whose values changed, as an update', () => {
+    const existing = [{ ...buildTradeImport({ positionText: POSITION, savedPosition: empty, savedCash: saved(CASH_FEES) }).trades[0], gross_pnl: 99 }]
+    const r = buildTradeImport({ positionText: POSITION, savedPosition: empty, savedCash: saved(CASH_FEES), existingTrades: existing })
+    expect(r.trades).toHaveLength(1)
+    expect(r).toMatchObject({ newTradeCount: 0, updateCount: 1, unchangedCount: 0 })
+  })
+
   it('Cash only (a withdrawal): records it, adds no trades', () => {
     const r = buildTradeImport({ cashText: CASH_WITHDRAWAL, savedPosition: saved(POSITION), savedCash: saved(CASH_FEES), existingTrades: [{ broker_id: '1', fees: 1.6 }] })
     expect(r.errors).toEqual([])

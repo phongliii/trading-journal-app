@@ -12,6 +12,9 @@
   - **Position History alone** takes fees from the Cash History you've
     already imported, and never replaces a trade's fees with $0.
   - Importing both together works as before.
+  - Re-importing trades you already have no longer reports (and rewrites)
+    every one of them as "updated" — only trades whose values changed are
+    updated; the rest show as unchanged.
 - Dashboard **Max Drawdown** card follows the Equity / Balance chart's range
   tab (1W / 1M / 3M / YTD / ALL) instead of always being all-time, and its
   title shows the tab (e.g. "Max Drawdown · 1M"). Without Cash History it

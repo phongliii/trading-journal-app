@@ -111,7 +111,7 @@ async function importFiles({ position, cash, balance }) {
         existingTrades: tradesStore.trades,
       })
       if (plan.errors.length) { toast.warn(plan.errors.join('; ')); return }
-      if (posText && !plan.newTradeCount) { toast.error('No valid trades found'); return }
+      if (posText && !plan.fileTradeCount) { toast.error('No valid trades found'); return }
       // Surface structural issues before the confirm dialog, not after.
       for (const w of plan.warnings) toast.warn(w)
     }
@@ -121,7 +121,9 @@ async function importFiles({ position, cash, balance }) {
     if (plan?.fundTransactions.length) adds.push(plural(plan.fundTransactions.length, 'fund transaction'))
     const lines = []
     if (adds.length) lines.push(`This will add ${adds.join(' and ')} to your journal.`)
+    if (plan?.updateCount) lines.push(`${plural(plan.updateCount, 'trade')} you already have will be updated.`)
     if (plan?.refreshCount) lines.push('Fees on matching trades you already have will be updated.')
+    if (plan?.unchangedCount && !lines.length) lines.push(`All ${plural(plan.unchangedCount, 'trade')} in this file are already in your journal.`)
     if (cashText && !lines.length) lines.push('This will update your cash history.')
     if (bal) lines.push(`Starting balance will be set to $${bal.rawStarting.toFixed(2)}, effective ${bal.earliestBalanceDate || 'unknown date'}.`)
 
@@ -163,7 +165,7 @@ async function importFiles({ position, cash, balance }) {
         ? await tradesStore.insertTrades(plan.trades)
         : { inserted: 0, updated: 0, skipped: 0 }
       if (posText) {
-        reportTrades(result)
+        reportTrades({ ...result, skipped: result.skipped + plan.unchangedCount })
       } else {
         toast.success(result.updated > 0
           ? `Cash History imported — fees updated on ${plural(result.updated, 'trade')}`
