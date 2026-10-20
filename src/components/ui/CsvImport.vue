@@ -1,56 +1,30 @@
 <template>
   <slot :trigger="openPicker" />
 
-  <!-- Import CSV modal: one drop zone for any mix of Position History, Cash
+  <!-- Import CSV: one drop zone for any mix of Position History, Cash
        History and Account Balance History — each file does its own part
        (see importFiles / lib/tradeImport.js). -->
-  <Teleport to="body">
-    <div v-if="modalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" @click.self="closeModal">
-      <div class="bg-surface-2 border border-border rounded-xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col">
-        <div class="px-5 py-4 border-b border-border flex items-center justify-between flex-shrink-0">
-          <div>
-            <h2 class="text-sm font-semibold text-ink">Import CSV</h2>
-            <p class="text-xs text-ink-muted mt-0.5">Drop any of your broker files — each one can be imported on its own.</p>
-          </div>
-          <TooltipWrap tip="Close">
-            <button class="text-ink-faint hover:text-ink transition-colors flex-shrink-0" @click="closeModal">
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-              </svg>
-            </button>
-          </TooltipWrap>
-        </div>
-
-        <div class="p-5 space-y-4 overflow-y-auto">
-          <FileDropZone
-            accept=".csv,.tsv,.txt,text/csv,text/plain,text/tab-separated-values,application/vnd.ms-excel"
-            hint="Position, Cash, Account Balance History — any combination"
-            @files="onFiles" />
-          <ul v-if="fileList.length" class="space-y-2">
-            <FileListRow
-              v-for="f in fileList" :key="f.zone"
-              :name="f.file.name" :status="f.label" :ok="true"
-              @remove="zoneFiles[f.zone] = null" />
-          </ul>
-          <ul class="text-2xs text-ink-faint space-y-1 leading-relaxed">
-            <li><span class="text-ink-muted">Position History</span> — adds your trades, with fees from any Cash History you've imported.</li>
-            <li><span class="text-ink-muted">Cash History</span> — deposits &amp; withdrawals, and fees on trades you already have. Never adds trades.</li>
-            <li><span class="text-ink-muted">Account Balance History</span> — sets your starting balance.</li>
-          </ul>
-        </div>
-
-        <div class="px-5 py-4 border-t border-border flex gap-3 flex-shrink-0">
-          <button class="btn btn-ghost btn-sm flex-1" @click="closeModal">Cancel</button>
-          <button
-            class="btn btn-primary btn-sm flex-1"
-            :disabled="!fileList.length"
-            @click="runImport">
-            Import
-          </button>
-        </div>
-      </div>
-    </div>
-  </Teleport>
+  <FileImportModal
+    :open="modalOpen" title="Import CSV"
+    subtitle="Drop any of your broker files — each one can be imported on its own."
+    :disabled="!fileList.length"
+    @close="closeModal" @submit="runImport">
+    <FileDropZone
+      accept=".csv,.tsv,.txt,text/csv,text/plain,text/tab-separated-values,application/vnd.ms-excel"
+      hint="Position, Cash, Account Balance History — any combination"
+      @files="onFiles" />
+    <ul v-if="fileList.length" class="space-y-2">
+      <FileListRow
+        v-for="f in fileList" :key="f.zone"
+        :name="f.file.name" :status="f.label" :ok="true"
+        @remove="zoneFiles[f.zone] = null" />
+    </ul>
+    <ul class="text-2xs text-ink-faint space-y-1 leading-relaxed">
+      <li><span class="text-ink-muted">Position History</span> — adds your trades, with fees from any Cash History you've imported.</li>
+      <li><span class="text-ink-muted">Cash History</span> — deposits &amp; withdrawals, and fees on trades you already have. Never adds trades.</li>
+      <li><span class="text-ink-muted">Account Balance History</span> — sets your starting balance.</li>
+    </ul>
+  </FileImportModal>
 </template>
 
 <script setup>
@@ -63,7 +37,7 @@ import { useCashEventsStore } from '@/stores/cashEvents'
 import { useRawCsvArchiveStore } from '@/stores/rawCsvArchive'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
-import TooltipWrap from '@/components/ui/TooltipWrap.vue'
+import FileImportModal from '@/components/ui/FileImportModal.vue'
 import FileDropZone from '@/components/ui/FileDropZone.vue'
 import FileListRow from '@/components/ui/FileListRow.vue'
 
