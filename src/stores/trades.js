@@ -10,6 +10,13 @@ import { useAccountsStore } from './accounts'
 // field changing, not just a hand-picked subset) and trade lists are small
 // enough that the cost is a non-issue next to the network round-trip that
 // just happened anyway.
+function withDuration(t) {
+  if (t.duration || !t.bought_at || !t.sold_at) return t
+  const s = Math.floor(Math.abs(new Date(t.sold_at) - new Date(t.bought_at)) / 1000)
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60
+  return { ...t, duration: h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${sec}s` : `${sec}s` }
+}
+
 function sameTrades(a, b) {
   return a.length === b.length && JSON.stringify(a) === JSON.stringify(b)
 }
@@ -19,6 +26,7 @@ export const useTradesStore = defineStore('trades', () => {
   const trades  = ref([])
   const loading = ref(false)
   const error   = ref(null)
+  const loaded  = ref(false) // a load has finished at least once
 
   // Coalesce concurrent calls into one shared in-flight promise instead of
   // starting a second, overlapping doLoad() — same fix, same reasoning, as
@@ -39,38 +47,24 @@ export const useTradesStore = defineStore('trades', () => {
     loading.value = true
     error.value   = null
     try {
-      const fresh = await adapter.loadTrades(accountsStore.activeAccountId)
+      // Fill in a missing duration from the open/close times. Done on the
+      // fresh rows BEFORE comparing: it's display-only and never saved
+      // (the cloud adapter has no bulk save), so comparing the raw rows
+      // against already-filled ones made every reload look "changed" and
+      // redrew every chart on each tab focus / page change.
+      const fresh = (await adapter.loadTrades(accountsStore.activeAccountId)).map(withDuration)
       // Skip reassigning when a reload returns exactly what's already
       // here — every background refresh (navigation, tab focus; see
       // lib/cloudSync.js) is a real possibility even when nothing has
       // actually changed since the last visit. Replacing trades.value
-      // with a brand-new (but equal) array on a no-op reload gives every
-      // computed/component that reads it — Dashboard's charts, in
-      // particular — a new reference to react to, which redraws them even
-      // though nothing on screen actually changed: a visible flicker for
-      // no reason. Comparing first means an unchanged reload leaves the
-      // existing array alone, so nothing downstream re-renders.
+      // with a brand-new (but equal) array would give every computed/
+      // component that reads it — Dashboard's charts in particular — a new
+      // reference to react to, redrawing them for no reason.
       if (sameTrades(fresh, trades.value)) return
       trades.value = fresh
-      // Migrate: calculate duration for trades missing it
-      let migrated = false
-      trades.value = trades.value.map(t => {
-        if (!t.duration && t.bought_at && t.sold_at) {
-          const diffMs = Math.abs(new Date(t.sold_at) - new Date(t.bought_at))
-          const s = Math.floor(diffMs / 1000)
-          const h = Math.floor(s / 3600)
-          const m = Math.floor((s % 3600) / 60)
-          const sec = s % 60
-          const duration = h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${sec}s` : `${sec}s`
-          migrated = true
-          return { ...t, duration }
-        }
-        return t
-      })
-      if (migrated) await adapter.saveTrades(trades.value)
     }
     catch (e) { error.value = e.message }
-    finally { loading.value = false }
+    finally { loading.value = false; loaded.value = true }
   }
 
   async function insertTrades(newTrades) {
@@ -111,7 +105,7 @@ export const useTradesStore = defineStore('trades', () => {
   })
 
   return {
-    trades, loading, error,
+    trades, loading, loaded, error,
     stats, totalFees,
     load, insertTrades, deleteTrade, deleteTrades, updateTrade, clearAll,
   }

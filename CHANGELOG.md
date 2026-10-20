@@ -48,6 +48,13 @@
   clicked day from the previous/next month isn't faded while its options show.
 
 ### Fixed
+- Dashboard charts drawing more than once: the page showed as soon as trades
+  loaded, then redrew the Equity / Balance chart (and popped in the Account
+  Balance card) when balance and cash history arrived a moment later. It now
+  waits for all three. Separately, every background refresh (switching
+  pages, returning to the tab) replaced the trades and redrew every chart
+  even when nothing had changed, because a display-only duration fill-in
+  made the reload look different; refreshes now leave unchanged trades alone.
 - Balance chart treated deposits/withdrawals like trading results: the line
   could turn red after a withdrawal, and the % on hover jumped (it was
   measured against deposited money, which a withdrawal shrinks). The colour

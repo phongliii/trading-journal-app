@@ -245,15 +245,14 @@ const rangePnlCurve = computed(() => {
 })
 
 // Drives the skeleton below — true until trades, balance AND cashEvents
-// have ALL loaded at least once, not just trades. This used to gate on
-// tradesStore alone: trades usually resolves first, so the skeleton came
-// down and the real page rendered, but currentBalance/the equity curve/
-// drawdown (all driven by balanceStore and cashEventsStore) were still
-// using their empty initial state at that moment — then popped to the
-// real numbers a beat later once those two finished. Waiting for every
-// store the page actually reads from closes that gap.
+// have ALL loaded at least once. Trades usually resolve first; showing the
+// page then meant the charts drew with an empty balance/cash history and
+// were torn down and redrawn a beat later when those arrived (plus the
+// Account Balance card popping in). Each store's `loaded` flag stays true
+// after its first load, so later background refreshes never bring the
+// skeleton back.
 const initialLoading = computed(() =>
-  tradesStore.trades.length === 0 && (tradesStore.loading || !balanceStore.loaded || !cashEventsStore.loaded)
+  !(tradesStore.loaded && balanceStore.loaded && cashEventsStore.loaded)
 )
 
 // Full balance history (starting balance + every trade + deposit/withdrawal).
