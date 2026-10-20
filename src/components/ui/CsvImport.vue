@@ -112,7 +112,7 @@ async function importFiles({ position, cash, balance }) {
         savedPosition: rawCsvArchive.data.position, savedCash: rawCsvArchive.data.cash,
         existingTrades: tradesStore.trades,
       })
-      if (plan.errors.length) { toast.warn(plan.errors.join('; ')); return }
+      if (plan.errors.length) { toast.error(plan.errors.join('; ')); return }
       if (posText && !plan.fileTradeCount) { toast.error('No valid trades found'); return }
       // Surface structural issues before the confirm dialog, not after.
       for (const w of plan.warnings) toast.warn(w)
@@ -153,7 +153,7 @@ async function importFiles({ position, cash, balance }) {
           plan.fundTransactions.length ? balanceStore.mergeTransactions(plan.fundTransactions) : 0,
           plan.cashEvents.length ? cashEventsStore.mergeEvents(plan.cashEvents) : 0,
         ])
-        if (added > 0) toast.info(`${plural(added, 'fund transaction')} recorded`)
+        if (added > 0) toast.success(`${plural(added, 'fund transaction')} recorded`)
       }
 
       // Archive the original, untouched CSV rows (exact broker columns): later
@@ -206,7 +206,7 @@ async function handleFiles(files) {
 async function runSingle(text) {
   try {
     const { trades, errors, warnings } = parseCSV(text)
-    if (errors.length) { toast.warn(errors.join('; ')); return }
+    if (errors.length) { toast.error(errors.join('; ')); return }
     if (!trades.length) { toast.error('No valid trades found'); return }
     // Surface structural issues (missing columns, skipped blank rows) before
     // the confirm dialog, so they're seen BEFORE committing, not buried in a

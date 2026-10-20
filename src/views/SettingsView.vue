@@ -651,7 +651,7 @@ const fundTotalPages = computed(() => Math.ceil(balanceStore.fundTransactions.le
 async function clearImageFolder() {
   if (!await $confirm({ title: 'Disconnect Chart Image Folder', message: 'You will need to choose a folder again to attach chart images. Existing images already saved will not be deleted.', confirmLabel: 'Disconnect', danger: true })) return
   await imageStorageStore.clearFolder()
-  toast.info('Chart image folder disconnected')
+  toast.success('Chart image folder disconnected')
 }
 
 async function chooseImageFolder() {
@@ -684,7 +684,7 @@ async function clearAllImages() {
       await imageStorageStore.clearAllImages()
       await journalStore.clearAllEntryImages()
     })
-    toast.info('All chart images cleared')
+    toast.success('All chart images cleared')
   } catch (e) {
     console.error(e)
     toast.error('Could not clear images: ' + e.message)
@@ -694,7 +694,7 @@ async function clearAllImages() {
 async function clearBalance() {
   if (!await $confirm({ title: 'Clear Account Balance', message: 'This will permanently delete your starting balance and balance tracking. You\'ll need to re-import your Account Balance History file to set it up again.', confirmLabel: 'Clear', danger: true })) return
   balanceStore.clearBalance()
-  toast.info('Account balance cleared')
+  toast.success('Account balance cleared')
 }
 
 const lastImport = computed(() => {
@@ -755,7 +755,7 @@ async function clearAll() {
     toast.error('Could not clear trades: ' + e.message)
     return
   }
-  toast.info('All trades cleared')
+  toast.success('All trades cleared')
 }
 
 function signOut() {
