@@ -52,8 +52,9 @@ describe('buildTradeImport', () => {
     expect(r.errors).toEqual([])
     expect(r.fundTransactions).toEqual([{ id: '900', date: '2026-10-14', amount: -500, type: 'withdrawal' }])
     expect(r.newTradeCount).toBe(0)
-    // The existing trade is re-derived with the same fees (insertTrades skips it as unchanged).
-    expect(r.trades.map(t => t.fees)).toEqual([1.6])
+    // The existing trade's fees don't change, so it isn't sent (or counted) at all.
+    expect(r.trades).toEqual([])
+    expect(r.refreshCount).toBe(0)
   })
 
   it('Cash only: fills in fees on trades you already have, via the saved Position rows', () => {
@@ -62,6 +63,14 @@ describe('buildTradeImport', () => {
     expect(r.refreshCount).toBe(1)
     expect(r.trades).toHaveLength(1)
     expect(r.trades[0]).toMatchObject({ broker_id: '1', fees: 1.6, pnl: 8.4 })
+  })
+
+  it('Cash only: sends only the trades whose fees change', () => {
+    const position = csv(POSITION, '2,300,400,1,MNQZ6,20000.00,20003.00,$6.00,10/06/2026 09:30:00,10/06/2026 09:35:00')
+    const existing = [{ broker_id: '1', fees: 1.6, pnl: 8.4 }, { broker_id: '2', fees: 0, pnl: 6 }]
+    const r = buildTradeImport({ cashText: csv(HEAD, ...feeRows(300), ...feeRows(400)), savedPosition: saved(position), savedCash: saved(CASH_FEES), existingTrades: existing })
+    expect(r.trades.map(t => [t.broker_id, t.fees])).toEqual([['2', 1.6]])
+    expect(r.refreshCount).toBe(1)
   })
 
   it('Cash only: never adds a trade that is not already in the journal', () => {

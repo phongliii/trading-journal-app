@@ -69,6 +69,10 @@ export function buildTradeImport({ positionText = null, cashText = null, savedPo
     const savedText = toCsv(savedPosition.headers, savedPosition.rows)
     refreshed = parseDualCSV(savedText, feeText).trades
       .filter(t => t.broker_id && byBrokerId.has(String(t.broker_id)) && !inFile.has(String(t.broker_id)))
+      // Only trades whose fees actually change — insertTrades counts (and
+      // rewrites) every trade it's given, so sending the unchanged ones too
+      // would report "fees updated on" every trade you have.
+      .filter(t => t.fees > 0 && Math.abs(t.fees - (byBrokerId.get(String(t.broker_id)).fees || 0)) >= 0.005)
   }
 
   // Never replace fees a trade already has with $0 — that only means no
