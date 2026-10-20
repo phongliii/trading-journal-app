@@ -3,6 +3,18 @@
 ## Unreleased
 
 ### Changed
+- **Loading cover** for long actions: importing, restoring Journal Data,
+  Reset Everything, deleting all/many trades, clearing chart images,
+  deleting a portfolio and switching portfolio now show a "please wait"
+  cover with the current step, instead of a small toast. It blocks the page
+  until every cloud save has finished, asks before the tab is closed
+  mid-way, and always closes when done — even on an error. Quick actions
+  (under ¼ s) never show it.
+- **Charts redraw only when what they show changes.** All five charts now
+  share one drawing helper: data handed back with the same values (a
+  reload, a tab switch, an import) causes no redraw at all, several changes
+  at once draw once, and a real change (e.g. a new range tab) updates the
+  chart in place instead of rebuilding it.
 - **Import CSV** is one drop zone for any mix of Position History, Cash
   History and Account Balance History (no more Trade / Account tabs), and
   each file can be imported on its own:

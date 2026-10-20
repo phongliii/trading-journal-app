@@ -56,6 +56,7 @@
 
     <ToastStack />
     <ConfirmModal />
+    <BusyOverlay />
     <TargetReachedModal :target="targetReached" @close="targetReached = null" />
   </div>
 </template>
@@ -83,10 +84,12 @@ import { useAuthStore } from '@/stores/auth'
 import { syncSettingsOnLoad } from '@/lib/cloudSettings'
 import { registerStore, requestCloudRefresh, markCloudRefreshed, setCloudSyncReady, PAGE_STORES } from '@/lib/cloudSync'
 import { useToast } from '@/composables/useToast'
+import { useBusy } from '@/composables/useBusy'
 import AppSidebar   from '@/components/layout/AppSidebar.vue'
 import AppTopbar    from '@/components/layout/AppTopbar.vue'
 import ToastStack   from '@/components/ui/ToastStack.vue'
 import ConfirmModal from '@/components/ui/ConfirmModal.vue'
+import BusyOverlay  from '@/components/ui/BusyOverlay.vue'
 import TargetReachedModal from '@/components/ui/TargetReachedModal.vue'
 import AppShellSkeleton from '@/components/layout/AppShellSkeleton.vue'
 
@@ -123,6 +126,7 @@ const rawCsvArchiveStore = useRawCsvArchiveStore()
 const accountsStore      = useAccountsStore()
 const authStore         = useAuthStore()
 const toast          = useToast()
+const busy           = useBusy()
 
 // Withdraw reminder — the rule lives in lib/withdrawReminder.js: the week
 // is decided on its first trading day (balance going into that day at/above
@@ -317,13 +321,13 @@ watch(() => accountsStore.activeAccountId, async (id, prevId) => {
   markCloudRefreshed(ALL_CLOUD_STORES)
   switchingPortfolio = true
   try {
-    await Promise.all([
+    await busy.run('Switching portfolio…', () => Promise.all([
       tradesStore.load(),
       balanceStore.load(),
       cashEventsStore.load(),
       journalStore.load(),
       rawCsvArchiveStore.load(),
-    ])
+    ]))
   } finally {
     switchingPortfolio = false
   }

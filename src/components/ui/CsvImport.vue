@@ -37,6 +37,7 @@ import { useCashEventsStore } from '@/stores/cashEvents'
 import { useRawCsvArchiveStore } from '@/stores/rawCsvArchive'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import { useBusy } from '@/composables/useBusy'
 import FileImportModal from '@/components/ui/FileImportModal.vue'
 import FileDropZone from '@/components/ui/FileDropZone.vue'
 import FileListRow from '@/components/ui/FileListRow.vue'
@@ -48,6 +49,7 @@ const cashEventsStore = useCashEventsStore()
 const rawCsvArchive = useRawCsvArchiveStore()
 const toast = useToast()
 const { confirm: $confirm } = useConfirm()
+const busy = useBusy()
 
 // zoneFiles: the one file of each kind waiting to be imported.
 const modalOpen = ref(false)
@@ -130,39 +132,41 @@ async function importFiles({ position, cash, balance }) {
     const ok = await $confirm({ title: 'Import CSV', message: lines.join(' '), confirmLabel: 'Import' })
     if (!ok) return
 
-    // Everything from here on writes to Supabase — the loading toast is the
-    // only sign anything's happening until it resolves.
-    const loadingId = toast.loading('Importing…')
-    try {
+    // Everything from here on writes to Supabase, often several saves in a
+    // row — the loading cover blocks the page until they've all finished.
+    const hasCash = plan && (plan.fundTransactions.length || plan.cashEvents.length)
+    const backups = !!(bal || posText || cashText)
+    const total = [bal, hasCash, backups, plan?.trades.length].filter(Boolean).length
+    await busy.run('Importing…', async step => {
       if (bal) {
+        step('Setting starting balance')
         await balanceStore.setStartingBalance(bal.rawStarting, bal.earliestBalanceDate)
-        // Archive the original rows so the Export page can produce a re-importable file
-        const balRows = parseRows(balText)
-        if (balRows.length) await rawCsvArchive.mergeRows('balance', Object.keys(balRows[0]), balRows)
         toast.success(`Starting balance set to $${bal.rawStarting.toFixed(2)}`)
       }
-      if (!plan) return
 
-      // Fund transactions + raw cash events (drawdown/peak equity), merged
-      // together: both update their store before their first await, so the
-      // Dashboard's charts redraw once for the pair instead of once each.
-      const [added] = await Promise.all([
-        plan.fundTransactions.length ? balanceStore.mergeTransactions(plan.fundTransactions) : 0,
-        plan.cashEvents.length ? cashEventsStore.mergeEvents(plan.cashEvents) : 0,
-      ])
-      if (added > 0) toast.info(`${plural(added, 'fund transaction')} recorded`)
+      if (hasCash) {
+        step('Recording deposits & withdrawals')
+        // Fund transactions + raw cash events (drawdown/peak equity), merged
+        // together: both update their store before their first await, so the
+        // Dashboard's charts redraw once for the pair instead of once each.
+        const [added] = await Promise.all([
+          plan.fundTransactions.length ? balanceStore.mergeTransactions(plan.fundTransactions) : 0,
+          plan.cashEvents.length ? cashEventsStore.mergeEvents(plan.cashEvents) : 0,
+        ])
+        if (added > 0) toast.info(`${plural(added, 'fund transaction')} recorded`)
+      }
+
       // Archive the original, untouched CSV rows (exact broker columns): later
       // imports take fees from them, and an Export page download of them
       // re-imports the same way this file did.
-      if (posText) {
-        const posRows = parseRows(posText)
-        if (posRows.length) await rawCsvArchive.mergeRows('position', Object.keys(posRows[0]), posRows)
+      if (backups) step('Backing up your files')
+      for (const [kind, text] of [['balance', balText], ['position', posText], ['cash', cashText]]) {
+        const rows = text ? parseRows(text) : []
+        if (rows.length) await rawCsvArchive.mergeRows(kind, Object.keys(rows[0]), rows)
       }
-      if (cashText) {
-        const cashRows = parseRows(cashText)
-        if (cashRows.length) await rawCsvArchive.mergeRows('cash', Object.keys(cashRows[0]), cashRows)
-      }
+      if (!plan) return
 
+      if (plan.trades.length) step('Saving trades')
       const result = plan.trades.length
         ? await tradesStore.insertTrades(plan.trades)
         : { inserted: 0, updated: 0, skipped: 0 }
@@ -174,9 +178,7 @@ async function importFiles({ position, cash, balance }) {
           : 'Cash History imported')
         emit('done', result)
       }
-    } finally {
-      toast.dismiss(loadingId)
-    }
+    }, { total })
   } catch (e) {
     toast.error('Import failed: ' + e.message)
   }
@@ -218,12 +220,10 @@ async function runSingle(text) {
     })
     if (!ok) return
 
-    const loadingId = toast.loading(`Importing ${plural(trades.length, 'trade')}…`)
-    try {
+    await busy.run(`Importing ${plural(trades.length, 'trade')}…`, async step => {
+      step('Saving trades')
       reportTrades(await tradesStore.insertTrades(trades))
-    } finally {
-      toast.dismiss(loadingId)
-    }
+    })
   } catch (e) {
     toast.error('Import failed: ' + e.message)
   }

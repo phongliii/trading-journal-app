@@ -190,6 +190,8 @@
 <script setup>
 import { useConfirm } from '@/composables/useConfirm'
 const { confirm: $confirm } = useConfirm()
+import { useBusy } from '@/composables/useBusy'
+const busy = useBusy()
 import { ref, computed, h, watch } from 'vue'
 import { useTradesStore }   from '@/stores/trades'
 import { useJournalStore }  from '@/stores/journal'
@@ -259,25 +261,29 @@ async function confirmClearTrades() {
 
   if (!await $confirm({ title, message, confirmLabel: 'Delete', danger: true })) return
 
-  if (isFiltered) {
-    // One batch delete instead of one deleteTrade() call per trade — a loop
-    // here rewrites the whole trades array to localStorage on every single
-    // iteration, which is the "modal won't close / page looks frozen" bug.
-    await tradesStore.deleteTrades(tradesToClear.map(t => t.id))
-    // Clear fund transactions within the same date range
-    const start = rangeStart.value || filterDate.value
-    const end   = rangeEnd.value   || filterDate.value
-    balanceStore.setFundTransactions(
-      balanceStore.fundTransactions.filter(t => t.date < start || t.date > end)
-    )
-    // Clear cash events within the same date range
-    cashEventsStore.removeInRange(start, end + 'T23:59:59')
-  } else {
-    await tradesStore.clearAll()
-    balanceStore.clearFundTransactions()
-    cashEventsStore.clearAll()
-    journalStore.clearWeeklyData()
-  }
+  // Several cloud deletes in a row — the loading cover waits for all of them.
+  await busy.run('Deleting trades…', async () => {
+    if (isFiltered) {
+      // One batch delete instead of one deleteTrade() call per trade — a loop
+      // here rewrites the whole trades array to localStorage on every single
+      // iteration, which is the "modal won't close / page looks frozen" bug.
+      await tradesStore.deleteTrades(tradesToClear.map(t => t.id))
+      // Clear fund transactions and cash events within the same date range
+      const start = rangeStart.value || filterDate.value
+      const end   = rangeEnd.value   || filterDate.value
+      await Promise.all([
+        balanceStore.setFundTransactions(balanceStore.fundTransactions.filter(t => t.date < start || t.date > end)),
+        cashEventsStore.removeInRange(start, end + 'T23:59:59'),
+      ])
+    } else {
+      await tradesStore.clearAll()
+      await Promise.all([
+        balanceStore.clearFundTransactions(),
+        cashEventsStore.clearAll(),
+        journalStore.clearWeeklyData(),
+      ])
+    }
+  })
 
   filterDate.value = ''
   rangeStart.value = ''

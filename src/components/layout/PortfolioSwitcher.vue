@@ -74,10 +74,12 @@
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useAccountsStore } from '@/stores/accounts'
 import { useConfirm } from '@/composables/useConfirm'
+import { useBusy } from '@/composables/useBusy'
 import AddTextItemModal from '@/components/ui/AddTextItemModal.vue'
 
 const accountsStore = useAccountsStore()
 const { confirm: $confirm } = useConfirm()
+const busy = useBusy()
 
 const open = ref(false)
 const root = ref(null)
@@ -146,7 +148,7 @@ async function startDelete(a) {
     danger: true,
   })
   if (!ok) return
-  await accountsStore.deleteAccount(a.id)
+  await busy.run(`Deleting "${a.name}"…`, () => accountsStore.deleteAccount(a.id))
 }
 
 function onClickOutside(e) {

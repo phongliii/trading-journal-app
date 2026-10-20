@@ -8,10 +8,11 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onBeforeUnmount } from 'vue'
 import { Chart, LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
 import { format, parseISO } from 'date-fns'
 import { createExternalTooltip } from '@/lib/chartTooltip'
+import { useChart } from '@/lib/useChart'
 
 Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip)
 
@@ -20,7 +21,6 @@ const props = defineProps({
   mode:   { type: String, default: 'daily' } // 'daily' | 'weekly' | 'monthly'
 })
 const canvas = ref(null)
-let chart = null
 const { handler: tooltipHandler, cleanup: tooltipCleanup } = createExternalTooltip()
 
 // Zero line plugin
@@ -43,10 +43,9 @@ const zeroLinePlugin = {
   }
 }
 
-function buildChart() {
-  if (!canvas.value) return
-  if (chart) { chart.destroy(); chart = null }
-  if (!props.trades.length) return
+// The chart's Chart.js config (drawn by useChart), or null for nothing to draw.
+function makeConfig() {
+  if (!props.trades.length) return null
 
   // Sort by close time
   const sorted = [...props.trades].sort((a, b) =>
@@ -104,7 +103,7 @@ function buildChart() {
   const isPos  = data[data.length - 1] >= 0
   const color  = isPos ? '#00c896' : '#ef4444'
 
-  chart = new Chart(canvas.value, {
+  return {
     type: 'line',
     plugins: [zeroLinePlugin],
     data: {
@@ -170,10 +169,9 @@ function buildChart() {
         }
       }
     }
-  })
+  }
 }
 
-onMounted(buildChart)
-watch(() => props.trades, buildChart, { deep: true })
-onBeforeUnmount(() => { chart?.destroy(); tooltipCleanup() })
+useChart(canvas, () => props.trades, makeConfig)
+onBeforeUnmount(tooltipCleanup)
 </script>
