@@ -151,8 +151,8 @@ describe('parseDualCSV (Position_History + Cash_History)', () => {
 
   it('extracts deposits and withdrawals', () => {
     expect(result.fundTransactions).toEqual([
-      { date: '2026-10-01', amount: 5000, type: 'deposit' },
-      { date: '2026-10-06', amount: -1000, type: 'withdrawal' },
+      { id: '50', date: '2026-10-01', amount: 5000, type: 'deposit' },
+      { id: '900', date: '2026-10-06', amount: -1000, type: 'withdrawal' },
     ])
   })
 

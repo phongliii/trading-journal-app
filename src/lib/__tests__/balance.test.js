@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeCorrectStarting, computeCurrentBalance } from '../balance.js'
+import { computeCorrectStarting, computeCurrentBalance, mergeFundTransactions } from '../balance.js'
 
 const trade = (pnl, sold_at) => ({ pnl, sold_at })
 
@@ -46,5 +46,40 @@ describe('computeCorrectStarting', () => {
     const trades = [trade(300, '2026-08-20T10:00:00'), trade(40, '2026-09-01T10:00:00'), trade(7, null)]
     // 10000 - (2000 + 500) - 300
     expect(computeCorrectStarting(data, funds, trades)).toBe(7200)
+  })
+})
+
+describe('mergeFundTransactions', () => {
+  const w = (id, date, amount) => ({ id, date, amount, type: amount >= 0 ? 'deposit' : 'withdrawal' })
+
+  it('keeps two real same-day, same-amount withdrawals', () => {
+    const { merged, added } = mergeFundTransactions([], [w('1', '2026-10-14', -500), w('2', '2026-10-14', -500)])
+    expect(added).toBe(2)
+    expect(merged).toHaveLength(2)
+  })
+
+  it('skips ones already imported (same Transaction ID)', () => {
+    const { merged, added } = mergeFundTransactions([w('1', '2026-10-14', -500)], [w('1', '2026-10-14', -500), w('2', '2026-10-15', 300)])
+    expect(added).toBe(1)
+    expect(merged.map(t => t.id)).toEqual(['1', '2'])
+  })
+
+  it('matches older saved entries without an ID by date + amount, each once, and fills in the ID', () => {
+    const legacy = [{ date: '2026-10-14', amount: -500, type: 'withdrawal' }]
+    const { merged, added } = mergeFundTransactions(legacy, [w('1', '2026-10-14', -500), w('2', '2026-10-14', -500)])
+    // The first matches the old entry (no double count); the second is new.
+    expect(added).toBe(1)
+    expect(merged).toHaveLength(2)
+    expect(merged.map(t => t.id).sort()).toEqual(['1', '2'])
+  })
+
+  it('still de-duplicates by date + amount when no IDs are available', () => {
+    const t = { date: '2026-10-14', amount: -500, type: 'withdrawal' }
+    expect(mergeFundTransactions([t], [{ ...t }]).added).toBe(0)
+  })
+
+  it('returns the list sorted by date', () => {
+    const { merged } = mergeFundTransactions([w('2', '2026-10-20', 1)], [w('1', '2026-10-01', 1)])
+    expect(merged.map(t => t.date)).toEqual(['2026-10-01', '2026-10-20'])
   })
 })

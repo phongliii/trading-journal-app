@@ -48,6 +48,11 @@
   clicked day from the previous/next month isn't faded while its options show.
 
 ### Fixed
+- Two real deposits or withdrawals on the same day for the same amount were
+  treated as duplicates on import and only one was kept. They are now told
+  apart by the broker's Transaction ID; ones saved earlier without an ID are
+  matched once by date + amount (so re-importing never double counts) and get
+  the ID filled in.
 - Dashboard charts drawing more than once: the page showed as soon as trades
   loaded, then redrew the Equity / Balance chart (and popped in the Account
   Balance card) when balance and cash history arrived a moment later. It now

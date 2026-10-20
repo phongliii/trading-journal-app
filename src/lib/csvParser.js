@@ -453,8 +453,9 @@ export function parseFundTransactions(cashText) {
   const firstCols = splitLine(lines[0], ',').map(c => c.trim().replace(/^"|"$/g, ''))
   const hasHeader = isNaN(Number(firstCols[0]))
 
-  let idxDate, idxDelta, idxType
+  let idxDate, idxDelta, idxType, idxTxnId
   if (hasHeader) {
+    idxTxnId = firstCols.findIndex(h => h === 'Transaction ID')
     idxDate  = firstCols.findIndex(h => h === 'Date' || h === 'Timestamp')
     idxDelta = firstCols.findIndex(h => h === 'Delta')
     idxType  = firstCols.findIndex(h => h === 'Cash Change Type' || h === 'Type')
@@ -462,7 +463,7 @@ export function parseFundTransactions(cashText) {
     const dateIdx = firstCols.findIndex(h => h === 'Date')
     if (dateIdx !== -1) idxDate = dateIdx
   } else {
-    idxDate = 3; idxDelta = 4; idxType = 6
+    idxTxnId = 1; idxDate = 3; idxDelta = 4; idxType = 6
   }
 
   const txns = []
@@ -477,6 +478,9 @@ export function parseFundTransactions(cashText) {
     const date   = cols[idxDate] || ''
     if (!date) continue
     txns.push({
+      // The broker's Transaction ID — what tells two same-day, same-amount
+      // deposits/withdrawals apart (see mergeFundTransactions).
+      id: (idxTxnId >= 0 && cols[idxTxnId]) || null,
       date,
       amount,
       type: amount >= 0 ? 'deposit' : 'withdrawal',

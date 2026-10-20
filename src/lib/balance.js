@@ -32,3 +32,32 @@ export function computeCurrentBalance(data, fundTransactions, trades) {
   const fundFlow = fundTransactions.reduce((s, t) => s + t.amount, 0)
   return computeCorrectStarting(data, fundTransactions, trades) + sumPnl(trades) + fundFlow
 }
+
+/**
+ * Merge newly imported deposits/withdrawals into the saved list, skipping
+ * ones already there. Matched by the broker's Transaction ID, so two real
+ * transactions with the same date and amount are both kept. Saved entries
+ * from before IDs were stored (no `id`) are matched by date + amount
+ * instead — each one at most once — and get the ID filled in.
+ *
+ * @returns {{ merged: Array, added: number }} merged list, sorted by date
+ */
+export function mergeFundTransactions(existing, incoming) {
+  const merged = existing.map(t => ({ ...t }))
+  const ids = new Set(merged.filter(t => t.id).map(t => String(t.id)))
+  let added = 0
+  for (const t of incoming) {
+    if (t.id && ids.has(String(t.id))) continue
+    // Legacy entry (saved without an ID) for the same date + amount?
+    const legacy = merged.find(m => !m.id && m.date === t.date && m.amount === t.amount)
+    if (legacy) {
+      if (t.id) { legacy.id = t.id; ids.add(String(t.id)) }
+      continue
+    }
+    merged.push({ ...t })
+    if (t.id) ids.add(String(t.id))
+    added++
+  }
+  merged.sort((a, b) => a.date.localeCompare(b.date))
+  return { merged, added }
+}

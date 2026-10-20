@@ -5,7 +5,7 @@ import { useAccountsStore } from './accounts'
 import { balanceAdapter } from '@/lib/balanceAdapter'
 import { useToast } from '@/composables/useToast'
 import { reportCloudError } from '@/lib/cloudErrors'
-import { computeCorrectStarting, computeCurrentBalance } from '@/lib/balance'
+import { computeCorrectStarting, computeCurrentBalance, mergeFundTransactions } from '@/lib/balance'
 
 // Cloud-only now (see lib/balanceAdapter.js) — no localStorage copy. `data`
 // starts empty and is populated by load() (called from App.vue once
@@ -82,15 +82,13 @@ export const useBalanceStore = defineStore('balance', () => {
     await saveToCloud()
   }
 
+  // Matched by broker Transaction ID (see lib/balance.js), so two real
+  // same-day, same-amount deposits/withdrawals are both kept.
   async function mergeTransactions(newTxns) {
-    const existing = new Set(data.value.fundTransactions.map(t => `${t.date}|${t.amount}`))
-    const fresh = newTxns.filter(t => !existing.has(`${t.date}|${t.amount}`))
-    data.value = {
-      ...data.value,
-      fundTransactions: [...data.value.fundTransactions, ...fresh].sort((a, b) => a.date.localeCompare(b.date))
-    }
+    const { merged, added } = mergeFundTransactions(data.value.fundTransactions, newTxns)
+    data.value = { ...data.value, fundTransactions: merged }
     await saveToCloud()
-    return fresh.length
+    return added
   }
 
   async function clearFundTransactions() {
