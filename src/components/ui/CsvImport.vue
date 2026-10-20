@@ -143,12 +143,14 @@ async function importFiles({ position, cash, balance }) {
       }
       if (!plan) return
 
-      if (plan.fundTransactions.length) {
-        const added = await balanceStore.mergeTransactions(plan.fundTransactions)
-        if (added > 0) toast.info(`${plural(added, 'fund transaction')} recorded`)
-      }
-      // Raw cash events for drawdown/peak equity calculation
-      if (plan.cashEvents.length) await cashEventsStore.mergeEvents(plan.cashEvents)
+      // Fund transactions + raw cash events (drawdown/peak equity), merged
+      // together: both update their store before their first await, so the
+      // Dashboard's charts redraw once for the pair instead of once each.
+      const [added] = await Promise.all([
+        plan.fundTransactions.length ? balanceStore.mergeTransactions(plan.fundTransactions) : 0,
+        plan.cashEvents.length ? cashEventsStore.mergeEvents(plan.cashEvents) : 0,
+      ])
+      if (added > 0) toast.info(`${plural(added, 'fund transaction')} recorded`)
       // Archive the original, untouched CSV rows (exact broker columns): later
       // imports take fees from them, and an Export page download of them
       // re-imports the same way this file did.

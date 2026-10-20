@@ -86,6 +86,10 @@ export const useBalanceStore = defineStore('balance', () => {
   // same-day, same-amount deposits/withdrawals are both kept.
   async function mergeTransactions(newTxns) {
     const { merged, added } = mergeFundTransactions(data.value.fundTransactions, newTxns)
+    // Nothing new (a re-imported Cash file) → leave the data alone: a new
+    // object would redraw every chart reading it, and re-save for nothing.
+    // (added can be 0 while an older entry still gets its ID filled in.)
+    if (JSON.stringify(merged) === JSON.stringify(data.value.fundTransactions)) return 0
     data.value = { ...data.value, fundTransactions: merged }
     await saveToCloud()
     return added
