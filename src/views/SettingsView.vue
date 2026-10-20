@@ -449,6 +449,8 @@
 <script setup>
 import { useConfirm } from '@/composables/useConfirm'
 const { confirm: $confirm } = useConfirm()
+import { useBusy } from '@/composables/useBusy'
+const busy = useBusy()
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import TooltipWrap from '@/components/ui/TooltipWrap.vue'
@@ -678,8 +680,10 @@ async function clearAllImages() {
     danger: true,
   })) return
   try {
-    await imageStorageStore.clearAllImages()
-    journalStore.clearAllEntryImages()
+    await busy.run('Deleting chart images…', async () => {
+      await imageStorageStore.clearAllImages()
+      await journalStore.clearAllEntryImages()
+    })
     toast.info('All chart images cleared')
   } catch (e) {
     console.error(e)
@@ -718,13 +722,19 @@ async function resetAll() {
     danger: true
   })) return
   try {
-    await tradesStore.clearAll()
-    await balanceStore.clearBalance()
-    await balanceStore.clearFundTransactions()
-    await cashEventsStore.clearAll()
-    await journalAdapter.clearAll(accountsStore.activeAccountId)
-    await rawCsvArchiveStore.clearAll()
-    await clearCloudSettings()
+    await busy.run('Resetting everything…', async step => {
+      step('Deleting trades')
+      await tradesStore.clearAll()
+      step('Deleting balance & cash history')
+      await balanceStore.clearBalance()
+      await balanceStore.clearFundTransactions()
+      await cashEventsStore.clearAll()
+      step('Deleting journal')
+      await journalAdapter.clearAll(accountsStore.activeAccountId)
+      step('Deleting backed-up CSVs & settings')
+      await rawCsvArchiveStore.clearAll()
+      await clearCloudSettings()
+    }, { total: 4 })
   } catch (e) {
     toast.error('Reset stopped — nothing local was cleared: ' + e.message)
     return
@@ -740,7 +750,7 @@ async function resetAll() {
 async function clearAll() {
   if (!await $confirm({ title: 'Delete All Trades', message: `Delete all ${tradesStore.trades.length} trades? This cannot be undone.`, confirmLabel: 'Delete', danger: true })) return
   try {
-    await tradesStore.clearAll()
+    await busy.run('Deleting trades…', () => tradesStore.clearAll())
   } catch (e) {
     toast.error('Could not clear trades: ' + e.message)
     return

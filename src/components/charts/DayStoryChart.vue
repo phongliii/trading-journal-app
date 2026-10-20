@@ -3,9 +3,10 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onBeforeUnmount } from 'vue'
 import { Chart, LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
 import { createExternalTooltip } from '@/lib/chartTooltip'
+import { useChart } from '@/lib/useChart'
 
 Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip)
 
@@ -17,18 +18,17 @@ const props = defineProps({
 const emit = defineEmits(['select'])
 
 const canvas = ref(null)
-let chart = null
 const { handler: tooltipHandler, cleanup: tooltipCleanup } = createExternalTooltip()
 
-function buildChart() {
-  if (chart) chart.destroy()
-  if (!canvas.value || !props.points.length) return
+// The chart's Chart.js config (drawn by useChart), or null for nothing to draw.
+function makeConfig() {
+  if (!props.points.length) return null
 
   const pointColors = props.points.map((_, i) => i <= props.cutoffIndex ? '#4ade80' : '#f87171')
   const pointRadii  = props.points.map((_, i) => i === props.selectedIndex ? 6 : 2)
   const pointBorder = props.points.map((_, i) => i === props.selectedIndex ? '#fff' : 'transparent')
 
-  chart = new Chart(canvas.value, {
+  return {
     type: 'line',
     data: {
       labels: props.points.map(p => p.time),
@@ -65,10 +65,9 @@ function buildChart() {
         y: { border: { display: false }, grid: { color: '#1e2d4225' }, ticks: { color: '#5a7a9a', font: { size: 10 }, callback: v => '$' + v.toFixed(0) } },
       },
     },
-  })
+  }
 }
 
-onMounted(buildChart)
-watch(() => [props.points, props.cutoffIndex, props.selectedIndex], buildChart, { deep: true })
-onBeforeUnmount(() => { chart?.destroy(); tooltipCleanup() })
+useChart(canvas, () => [props.points, props.cutoffIndex, props.selectedIndex], makeConfig)
+onBeforeUnmount(tooltipCleanup)
 </script>

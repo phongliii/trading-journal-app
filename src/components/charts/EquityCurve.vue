@@ -8,12 +8,13 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue'
+import { ref, onBeforeUnmount, computed } from 'vue'
 import { Chart, LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
 import { format, parseISO, eachDayOfInterval, isWeekend, isSameWeek, differenceInCalendarDays } from 'date-fns'
 import { rangeStart } from '@/lib/realizedPnl'
 import { fmt } from '@/lib/stats'
 import { createExternalTooltip } from '@/lib/chartTooltip'
+import { useChart } from '@/lib/useChart'
 import { useTimezoneStore } from '@/stores/timezone'
 
 const tzStore = useTimezoneStore()
@@ -56,7 +57,6 @@ const props = defineProps({
 })
 
 const canvas  = ref(null)
-let chart = null
 const { handler: tooltipHandler, cleanup: tooltipCleanup } = createExternalTooltip()
 const hasData = computed(() => props.curve.length > 1)
 
@@ -73,10 +73,9 @@ function valuesAt(curveArr, isoDates, fallback) {
   })
 }
 
-function buildChart() {
-  if (!canvas.value) return
-  if (chart) { chart.destroy(); chart = null }
-  if (!props.curve.length) return
+// The chart's Chart.js config (drawn by useChart), or null for nothing to draw.
+function makeConfig() {
+  if (!props.curve.length) return null
 
   const today = tzStore.localDateObj()
   // One point per day on every tab, so hovering always shows a single day.
@@ -129,7 +128,7 @@ function buildChart() {
     pctData = pnlVals.map((pnl, i) => (capital[i] > 0 ? (pnl / capital[i]) * 100 : null))
   }
 
-  chart = new Chart(canvas.value, {
+  return {
     type: 'line',
     plugins: [zeroLinePlugin],
     data: {
@@ -192,10 +191,9 @@ function buildChart() {
         }
       }
     }
-  })
+  }
 }
 
-onMounted(buildChart)
-watch(() => [props.curve, props.range, props.pnlCurve, props.capitalCurve, props.baseCapital, props.fundTransactions], buildChart, { deep: true })
-onBeforeUnmount(() => { chart?.destroy(); tooltipCleanup() })
+useChart(canvas, () => [props.curve, props.range, props.pnlCurve, props.capitalCurve, props.baseCapital, props.fundTransactions], makeConfig)
+onBeforeUnmount(tooltipCleanup)
 </script>

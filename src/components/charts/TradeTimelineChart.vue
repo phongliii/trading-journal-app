@@ -3,9 +3,10 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onBeforeUnmount } from 'vue'
 import { Chart, ScatterController, PointElement, LinearScale, Tooltip } from 'chart.js'
 import { createExternalTooltip } from '@/lib/chartTooltip'
+import { useChart } from '@/lib/useChart'
 
 Chart.register(ScatterController, PointElement, LinearScale, Tooltip)
 
@@ -15,17 +16,16 @@ const props = defineProps({
 })
 
 const canvas = ref(null)
-let chart = null
 const { handler: tooltipHandler, cleanup: tooltipCleanup } = createExternalTooltip()
 
-function buildChart() {
-  if (chart) chart.destroy()
-  if (!canvas.value || !props.trades.length) return
+// The chart's Chart.js config (drawn by useChart), or null for nothing to draw.
+function makeConfig() {
+  if (!props.trades.length) return null
 
   const points = props.trades.map((t, i) => ({ x: i, y: t.pnl }))
   const colors = props.trades.map(t => t.pnl >= 0 ? '#4ade80' : '#f87171')
 
-  chart = new Chart(canvas.value, {
+  return {
     type: 'scatter',
     data: {
       datasets: [{
@@ -55,10 +55,9 @@ function buildChart() {
         y: { border: { display: false }, grid: { color: '#1e2d4225' }, ticks: { color: '#5a7a9a', font: { size: 10 }, callback: v => '$' + v.toFixed(0) } },
       },
     },
-  })
+  }
 }
 
-onMounted(buildChart)
-watch(() => [props.trades, props.cutoffIndex], buildChart, { deep: true })
-onBeforeUnmount(() => { chart?.destroy(); tooltipCleanup() })
+useChart(canvas, () => [props.trades, props.cutoffIndex], makeConfig)
+onBeforeUnmount(tooltipCleanup)
 </script>

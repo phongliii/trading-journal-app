@@ -110,10 +110,12 @@ import FileDropZone from '@/components/ui/FileDropZone.vue'
 import FileImportModal from '@/components/ui/FileImportModal.vue'
 import FileListRow from '@/components/ui/FileListRow.vue'
 import { useToast } from '@/composables/useToast'
+import { useBusy } from '@/composables/useBusy'
 import DatePickerCalendar from '@/components/ui/DatePickerCalendar.vue'
 import { EXPORT_TYPES, buildExport, downloadBlob, importJournalFiles } from '@/lib/exportData'
 
 const toast = useToast()
+const busy = useBusy()
 
 // ── Data-type dropdown (custom-styled, since a native <select>'s open menu
 // can't be themed). A plain absolutely-positioned list under the field,
@@ -234,7 +236,8 @@ async function runRestore() {
   const files = restoreFiles.value
   if (!files.length) return
   try {
-    const r = await importJournalFiles(files)
+    closeRestoreModal()
+    const r = await busy.run('Restoring…', () => importJournalFiles(files))
     const addedParts = []
     if (r.notesAdded) addedParts.push(`${r.notesAdded} note${r.notesAdded !== 1 ? 's' : ''}`)
     if (r.holidaysAdded) addedParts.push(`${r.holidaysAdded} holiday${r.holidaysAdded !== 1 ? 's' : ''}`)

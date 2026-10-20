@@ -5,9 +5,10 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onBeforeUnmount } from 'vue'
 import { Chart, BarController, BarElement, LinearScale, CategoryScale, Tooltip } from 'chart.js'
 import { createExternalTooltip } from '@/lib/chartTooltip'
+import { useChart } from '@/lib/useChart'
 
 Chart.register(BarController, BarElement, LinearScale, CategoryScale, Tooltip)
 
@@ -38,12 +39,10 @@ const props = defineProps({
 })
 
 const canvas = ref(null)
-let chart = null
 const { handler: tooltipHandler, cleanup: tooltipCleanup } = createExternalTooltip()
 
-function buildChart() {
-  if (!canvas.value) return
-  if (chart) { chart.destroy(); chart = null }
+// The chart's Chart.js config (drawn by useChart), or null for nothing to draw.
+function makeConfig() {
 
   const labels = props.labels
   const data = props.values
@@ -51,7 +50,7 @@ function buildChart() {
   const colors  = data.map(v => v > 0 ? '#00c896bb' : v < 0 ? '#ef4444bb' : '#3d547040')
   const borders = data.map(v => v > 0 ? '#00c896'   : v < 0 ? '#ef4444'   : '#3d5470')
 
-  chart = new Chart(canvas.value, {
+  return {
     type: 'bar',
     plugins: [zeroLinePlugin],
     data: { labels, datasets: [{ data, backgroundColor: colors, borderColor: borders, borderWidth: 1, borderRadius: 3 }] },
@@ -81,10 +80,9 @@ function buildChart() {
         }
       }
     }
-  })
+  }
 }
 
-onMounted(buildChart)
-watch(() => [props.labels, props.values, props.titles], buildChart, { deep: true })
-onBeforeUnmount(() => { chart?.destroy(); tooltipCleanup() })
+useChart(canvas, () => [props.labels, props.values, props.titles], makeConfig)
+onBeforeUnmount(tooltipCleanup)
 </script>
