@@ -19,6 +19,11 @@
   "Chart image"; with text too it adds "(+ chart image)").
 
 ### Fixed
+- Deposits/withdrawals: a **withdrawal that wasn't approved** (the broker
+  refunds it with a deposit of the same amount, Transaction ID + 1) showed as
+  a withdrawal and a deposit — on the Balance chart, in Settings, and it
+  counted as "withdrawn" for the withdraw reminder. Both are now left out;
+  the balance is unchanged, since they cancel out.
 - Balance chart: a deposit and a withdrawal on the same day were added
   together, so the hover showed only the net (and "Deposit +$0.00" when they
   cancelled out). Each is now listed on its own, and that day's dot is split
