@@ -23,6 +23,11 @@
   "Chart image"; with text too it adds "(+ chart image)").
 
 ### Fixed
+- Trading fees: when the broker's Transaction ID counter jumped in the middle
+  of a fill's fee rows, the rows after the jump weren't found, so those
+  trades showed too little in fees (and too much net P&L). Missing fee rows
+  are now also matched by the fill's time and contract. In one real account
+  this was $1.23 over 3 trades; every other trade was unchanged.
 - Deposits/withdrawals: a **withdrawal that wasn't approved** (the broker
   refunds it with a deposit of the same amount, Transaction ID + 1) showed as
   a withdrawal and a deposit — on the Balance chart, in Settings, and it
