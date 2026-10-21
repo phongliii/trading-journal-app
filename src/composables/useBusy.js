@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { holdDraws } from '@/lib/drawHold'
 
 // App-wide "please wait" cover for long actions (imports, restores, resets,
 // bulk deletes, switching portfolio) — shown by BusyOverlay.vue in App.vue.
@@ -27,7 +28,8 @@ export function useBusy() {
     const timer = setTimeout(() => { state.value = { ...state.value, visible: true } }, SHOW_AFTER)
     const step = label => { state.value = { ...state.value, step: label, index: state.value.index + 1 } }
     try {
-      return await fn(step)
+      // Charts wait for the whole action (see lib/drawHold.js).
+      return await holdDraws(() => fn(step))
     } finally {
       clearTimeout(timer)
       active = false

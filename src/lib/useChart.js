@@ -8,6 +8,10 @@
 //   3. A real change → the existing chart is updated in place instead of
 //      destroyed and rebuilt, so it doesn't flash or replay its grow-in
 //      animation.
+//   4. While fetches or saves are still running (sign-in, a portfolio
+//      switch, a background refresh, or an import/delete/restore/reset under
+//      the loading cover) → no drawing at all; the chart draws once when
+//      they've all finished, with the final data. See lib/drawHold.js.
 //
 // Usage (in a chart component's <script setup>):
 //   useChart(canvas, () => [props.a, props.b], makeConfig)
@@ -15,6 +19,7 @@
 // to draw, and reads only what the inputs getter returns (plus constants).
 import { watch, onMounted, onBeforeUnmount } from 'vue'
 import { Chart } from 'chart.js'
+import { drawsHeld } from '@/lib/drawHold'
 
 export function useChart(canvas, inputs, makeConfig) {
   let chart = null
@@ -25,7 +30,9 @@ export function useChart(canvas, inputs, makeConfig) {
 
   function draw() {
     frame = 0
-    if (!canvas.value) return
+    // Held (fetches or saves still running): wait and draw once, with the
+    // end result — a chart opened mid-refresh included.
+    if (!canvas.value || drawsHeld()) return
     const key = keyOf()
     if (key === drawnKey) return
     drawnKey = key
@@ -50,6 +57,7 @@ export function useChart(canvas, inputs, makeConfig) {
   // Watching the key (a string) means the watcher only fires when the
   // values change, not whenever an equal array is swapped in.
   watch(keyOf, schedule)
+  watch(drawsHeld, held => { if (!held) schedule() })
   onBeforeUnmount(() => {
     if (frame) cancelAnimationFrame(frame)
     chart?.destroy()
