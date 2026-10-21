@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+- **CI:** a GitHub Actions workflow runs the tests and a production build on
+  every pull request and every push to main, so each PR shows ✓ / ✕ before
+  it's merged.
+
 ### Changed
 - Journal: **+ Add section** only offers sections the note doesn't have yet
   (e.g. no "Review" when the note already has Review or Week Review), and
