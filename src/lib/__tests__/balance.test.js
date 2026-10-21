@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { computeCorrectStarting, computeCurrentBalance, mergeFundTransactions } from '../balance.js'
+import { computeCorrectStarting, computeCurrentBalance, mergeFundTransactions, withoutCancelledWithdrawals } from '../balance.js'
+import { parseFundTransactions } from '../csvParser.js'
 
 const trade = (pnl, sold_at) => ({ pnl, sold_at })
 
@@ -81,5 +82,36 @@ describe('mergeFundTransactions', () => {
   it('returns the list sorted by date', () => {
     const { merged } = mergeFundTransactions([w('2', '2026-10-20', 1)], [w('1', '2026-10-01', 1)])
     expect(merged.map(t => t.date)).toEqual(['2026-10-01', '2026-10-20'])
+  })
+})
+
+describe('withoutCancelledWithdrawals', () => {
+  // The real Oct 21 rows: a deposit, then a withdrawal that wasn't approved
+  // and its refund (Transaction ID + 1, same amount).
+  const CASH = [
+    'Account,Transaction ID,Timestamp,Date,Delta,Amount,Cash Change Type,Currency,Contract',
+    '1,20620483189,10/21/2026 08:42:55,2026-10-21,"1,000.00","1,763.72", Fund Transaction,USD,',
+    '1,20620487988,10/21/2026 09:46:15,2026-10-21,"-1,000.00","3,413.16", Fund Transaction,USD,',
+    '1,20620487989,10/21/2026 12:31:36,2026-10-21,"1,000.00","4,413.16", Fund Transaction,USD,',
+  ].join('\n')
+
+  it('drops an unapproved withdrawal and its refund, keeps the real deposit', () => {
+    const kept = withoutCancelledWithdrawals(parseFundTransactions(CASH))
+    expect(kept).toEqual([{ id: '20620483189', date: '2026-10-21', amount: 1000, type: 'deposit' }])
+  })
+
+  it('keeps a withdrawal whose next ID is a different amount, or not a refund', () => {
+    const txns = [
+      { id: '100', date: '2026-10-21', amount: -500, type: 'withdrawal' },
+      { id: '101', date: '2026-10-21', amount: 400, type: 'deposit' },
+      { id: '200', date: '2026-10-22', amount: -300, type: 'withdrawal' },
+      { id: '202', date: '2026-10-22', amount: 300, type: 'deposit' },
+    ]
+    expect(withoutCancelledWithdrawals(txns)).toBe(txns) // nothing dropped, same array
+  })
+
+  it('leaves entries without an ID alone', () => {
+    const txns = [{ date: '2026-10-21', amount: -500 }, { date: '2026-10-21', amount: 500 }]
+    expect(withoutCancelledWithdrawals(txns)).toBe(txns)
   })
 })

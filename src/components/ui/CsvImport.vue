@@ -31,6 +31,7 @@
 import { ref, computed } from 'vue'
 import { parseCSV, parseRows, detectCSVFormat, parseBalanceHistory } from '@/lib/csvParser'
 import { buildTradeImport } from '@/lib/tradeImport'
+import { withoutCancelledWithdrawals } from '@/lib/balance'
 import { useTradesStore } from '@/stores/trades'
 import { useBalanceStore } from '@/stores/balance'
 import { useCashEventsStore } from '@/stores/cashEvents'
@@ -120,7 +121,9 @@ async function importFiles({ position, cash, balance }) {
 
     const adds = []
     if (plan?.newTradeCount) adds.push(plural(plan.newTradeCount, 'trade'))
-    if (plan?.fundTransactions.length) adds.push(plural(plan.fundTransactions.length, 'fund transaction'))
+    // Unapproved withdrawals (and their refunds) aren't counted — see withoutCancelledWithdrawals.
+    const approvedFunds = plan ? withoutCancelledWithdrawals(plan.fundTransactions).length : 0
+    if (approvedFunds) adds.push(plural(approvedFunds, 'fund transaction'))
     const lines = []
     if (adds.length) lines.push(`This will add ${adds.join(' and ')} to your journal.`)
     if (plan?.updateCount) lines.push(`${plural(plan.updateCount, 'trade')} you already have will be updated.`)

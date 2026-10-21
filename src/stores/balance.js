@@ -5,7 +5,7 @@ import { useAccountsStore } from './accounts'
 import { balanceAdapter } from '@/lib/balanceAdapter'
 import { useToast } from '@/composables/useToast'
 import { reportCloudError } from '@/lib/cloudErrors'
-import { computeCorrectStarting, computeCurrentBalance, mergeFundTransactions } from '@/lib/balance'
+import { computeCorrectStarting, computeCurrentBalance, mergeFundTransactions, withoutCancelledWithdrawals } from '@/lib/balance'
 
 // Cloud-only now (see lib/balanceAdapter.js) — no localStorage copy. `data`
 // starts empty and is populated by load() (called from App.vue once
@@ -90,9 +90,15 @@ export const useBalanceStore = defineStore('balance', () => {
     // object would redraw every chart reading it, and re-save for nothing.
     // (added can be 0 while an older entry still gets its ID filled in.)
     if (JSON.stringify(merged) === JSON.stringify(data.value.fundTransactions)) return 0
+    const approvedBefore = withoutCancelledWithdrawals(data.value.fundTransactions || []).length
     data.value = { ...data.value, fundTransactions: merged }
     await saveToCloud()
-    return added
+    // How many new deposits/withdrawals actually count — an unapproved
+    // withdrawal and its refund are saved (for re-import matching) but not
+    // reported, the same as they're not shown.
+    // (Can go down: a refund imported later cancels a withdrawal already
+    // saved — nothing new to report then.)
+    return added && Math.max(0, withoutCancelledWithdrawals(merged).length - approvedBefore)
   }
 
   async function clearFundTransactions() {
@@ -105,7 +111,10 @@ export const useBalanceStore = defineStore('balance', () => {
     await saveToCloud()
   }
 
-  const fundTransactions  = computed(() => data.value.fundTransactions || [])
+  // Without unapproved withdrawals (withdrawal + same-amount refund) —
+  // see withoutCancelledWithdrawals. The saved list keeps them, so a
+  // re-import still recognises them by Transaction ID.
+  const fundTransactions  = computed(() => withoutCancelledWithdrawals(data.value.fundTransactions || []))
   const totalFundFlow     = computed(() => fundTransactions.value.reduce((s, t) => s + t.amount, 0))
   const hasBalance    = computed(() => data.value.rawStarting !== null && data.value.rawStarting !== undefined)
 
