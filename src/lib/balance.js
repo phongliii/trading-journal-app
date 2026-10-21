@@ -62,20 +62,34 @@ export function mergeFundTransactions(existing, incoming) {
   return { merged, added }
 }
 
-// Drops withdrawals that weren't approved. The broker records a rejected or
+// Withdrawals that weren't approved. The broker records a rejected or
 // cancelled withdrawal as the withdrawal itself plus a refund of the same
 // amount whose Transaction ID is the withdrawal's + 1 (e.g. −$1,000 at
-// …87988, then +$1,000 at …87989). Both are left out, so neither shows on
-// the chart nor counts as "withdrawn" for the reminder; the balance is the
-// same either way, since the pair cancels out. Returns the same array when
-// there's nothing to drop.
-export function withoutCancelledWithdrawals(txns) {
+// …87988, then +$1,000 at …87989). Returns the rows of each such pair.
+function cancelledPairs(txns) {
   const byId = new Map(txns.filter(t => t.id).map(t => [String(t.id), t]))
-  const drop = new Set()
+  const withdrawals = new Set(), refunds = new Set()
   for (const w of txns) {
     if (!(w.amount < 0) || !/^\d+$/.test(String(w.id ?? ''))) continue
     const refund = byId.get(String(BigInt(w.id) + 1n))
-    if (refund && Math.abs(refund.amount + w.amount) < 0.005) { drop.add(w); drop.add(refund) }
+    if (refund && Math.abs(refund.amount + w.amount) < 0.005) { withdrawals.add(w); refunds.add(refund) }
   }
-  return drop.size ? txns.filter(t => !drop.has(t)) : txns
+  return { withdrawals, refunds }
+}
+
+// Status of each deposit/withdrawal: 'approved', 'declined' (a withdrawal
+// the broker refunded) or 'refund' (that refund — shown as Declined too).
+export function fundStatus(txns) {
+  const { withdrawals, refunds } = cancelledPairs(txns)
+  return new Map(txns.map(t => [t, withdrawals.has(t) ? 'declined' : refunds.has(t) ? 'refund' : 'approved']))
+}
+
+// Drops withdrawals that weren't approved, with their refunds, so neither
+// shows on the chart nor counts as "withdrawn" for the reminder; the
+// balance is the same either way, since the pair cancels out. Returns the
+// same array when there's nothing to drop.
+export function withoutCancelledWithdrawals(txns) {
+  const { withdrawals, refunds } = cancelledPairs(txns)
+  if (!withdrawals.size) return txns
+  return txns.filter(t => !withdrawals.has(t) && !refunds.has(t))
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeCorrectStarting, computeCurrentBalance, mergeFundTransactions, withoutCancelledWithdrawals } from '../balance.js'
+import { computeCorrectStarting, computeCurrentBalance, mergeFundTransactions, withoutCancelledWithdrawals, fundStatus } from '../balance.js'
 import { parseFundTransactions } from '../csvParser.js'
 
 const trade = (pnl, sold_at) => ({ pnl, sold_at })
@@ -113,5 +113,18 @@ describe('withoutCancelledWithdrawals', () => {
   it('leaves entries without an ID alone', () => {
     const txns = [{ date: '2026-10-21', amount: -500 }, { date: '2026-10-21', amount: 500 }]
     expect(withoutCancelledWithdrawals(txns)).toBe(txns)
+  })
+})
+
+describe('fundStatus', () => {
+  it('marks the unapproved withdrawal and its refund, everything else approved', () => {
+    const txns = [
+      { id: '20620479695', date: '2026-10-19', amount: -1000 },
+      { id: '20620479696', date: '2026-10-19', amount: -500 },   // next ID, but another withdrawal
+      { id: '20620487988', date: '2026-10-21', amount: -1000 },
+      { id: '20620487989', date: '2026-10-21', amount: 1000 },   // its refund
+    ]
+    const s = fundStatus(txns)
+    expect(txns.map(t => s.get(t))).toEqual(['approved', 'approved', 'declined', 'refund'])
   })
 })

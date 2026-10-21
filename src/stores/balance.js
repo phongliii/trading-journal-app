@@ -115,6 +115,8 @@ export const useBalanceStore = defineStore('balance', () => {
   // see withoutCancelledWithdrawals. The saved list keeps them, so a
   // re-import still recognises them by Transaction ID.
   const fundTransactions  = computed(() => withoutCancelledWithdrawals(data.value.fundTransactions || []))
+  // Every saved one, unapproved withdrawals included (Settings lists them with a status).
+  const allFundTransactions = computed(() => data.value.fundTransactions || [])
   const totalFundFlow     = computed(() => fundTransactions.value.reduce((s, t) => s + t.amount, 0))
   const hasBalance    = computed(() => data.value.rawStarting !== null && data.value.rawStarting !== undefined)
 
@@ -130,7 +132,7 @@ export const useBalanceStore = defineStore('balance', () => {
 
   return {
     loading, loaded, load,
-    startingBalance, earliestBalanceDate, correctStarting, fundTransactions, totalFundFlow, hasBalance, currentBalance,
+    startingBalance, earliestBalanceDate, correctStarting, fundTransactions, allFundTransactions, totalFundFlow, hasBalance, currentBalance,
     setStartingBalance, setFundTransactions, mergeTransactions, clearBalance, clearFundTransactions,
   }
 })
