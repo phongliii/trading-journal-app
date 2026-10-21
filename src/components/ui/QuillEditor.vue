@@ -83,6 +83,9 @@ const sizeOptions = [
 const props = defineProps({
   modelValue:  { type: String, default: '' },
   placeholder: { type: String, default: 'Write something...' },
+  // Put the cursor in the editor as soon as it's ready (it sets up
+  // asynchronously, so the parent can't focus it right after mounting).
+  autofocus:   { type: Boolean, default: false },
 })
 const emit = defineEmits(['update:modelValue'])
 
@@ -126,6 +129,7 @@ onMounted(async () => {
   })
 
   if (props.modelValue) quill.root.innerHTML = props.modelValue
+  if (props.autofocus) quill.root.focus({ preventScroll: true })
 
   quill.on('text-change', () => {
     // An editor holding only blank lines is saved as '' (so it counts as
