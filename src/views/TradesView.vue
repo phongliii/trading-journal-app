@@ -1,11 +1,11 @@
 <template>
   <div class="p-6 space-y-4 w-full min-w-[1000px]">
 
-    <!-- Skeleton: shown only on the initial load, before we know whether
-         there are any trades yet — avoids flashing the "drop your CSV"
-         empty state for a moment before real data (or the real table)
-         appears. -->
-    <div v-if="tradesStore.loading && tradesStore.trades.length === 0" class="space-y-4">
+    <!-- Skeleton: shown on the initial load, before we know whether there
+         are any trades yet (avoids flashing the "drop your CSV" empty
+         state), and after switching portfolio until its trades arrive
+         (instead of the old portfolio's table). -->
+    <div v-if="showSkeleton" class="space-y-4">
       <div class="flex items-center gap-3">
         <Skeleton class="h-8 flex-1 max-w-xs !rounded-lg" />
         <Skeleton class="h-8 w-20 !rounded-lg" />
@@ -214,6 +214,7 @@ import { useBusy } from '@/composables/useBusy'
 const busy = useBusy()
 import { ref, computed, h, watch } from 'vue'
 import { useTradesStore }   from '@/stores/trades'
+import { useAccountsStore } from '@/stores/accounts'
 import { useJournalStore }  from '@/stores/journal'
 import { useBalanceStore }  from '@/stores/balance'
 import { useCashEventsStore } from '@/stores/cashEvents'
@@ -239,6 +240,10 @@ const SortArrow = {
 }
 
 const tradesStore     = useTradesStore()
+const accountsStore   = useAccountsStore()
+const showSkeleton = computed(() =>
+  (tradesStore.loading && tradesStore.trades.length === 0) ||
+  (tradesStore.loaded && tradesStore.settledFor !== accountsStore.activeAccountId))
 const journalStore    = useJournalStore()
 const balanceStore    = useBalanceStore()
 const cashEventsStore = useCashEventsStore()
