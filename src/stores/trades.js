@@ -28,6 +28,9 @@ export const useTradesStore = defineStore('trades', () => {
   const loading = ref(false)
   const error   = ref(null)
   const loaded  = ref(false) // a load has finished at least once
+  // Portfolio whose load last finished (ok or not) — Dashboard waits for
+  // trades, balance and cash events to all match the active one.
+  const settledFor = ref(null)
 
   // Coalesce concurrent calls into one shared in-flight promise instead of
   // starting a second, overlapping doLoad() — same fix, same reasoning, as
@@ -43,13 +46,14 @@ export const useTradesStore = defineStore('trades', () => {
   async function doLoad() {
     loading.value = true
     error.value   = null
+    const accountId = accountsStore.activeAccountId
     try {
       // Fill in a missing duration from the open/close times. Done on the
       // fresh rows BEFORE comparing: it's display-only and never saved
       // (the cloud adapter has no bulk save), so comparing the raw rows
       // against already-filled ones made every reload look "changed" and
       // redrew every chart on each tab focus / page change.
-      const fresh = (await adapter.loadTrades(accountsStore.activeAccountId)).map(withDuration)
+      const fresh = (await adapter.loadTrades(accountId)).map(withDuration)
       // Skip reassigning when a reload returns exactly what's already
       // here — every background refresh (navigation, tab focus; see
       // lib/cloudSync.js) is a real possibility even when nothing has
@@ -61,7 +65,7 @@ export const useTradesStore = defineStore('trades', () => {
       trades.value = fresh
     }
     catch (e) { error.value = e.message }
-    finally { loading.value = false; loaded.value = true }
+    finally { loading.value = false; loaded.value = true; settledFor.value = accountId }
   }
 
   async function insertTrades(newTrades) {
@@ -102,7 +106,7 @@ export const useTradesStore = defineStore('trades', () => {
   })
 
   return {
-    trades, loading, loaded, error,
+    trades, loading, loaded, settledFor, error,
     stats, totalFees,
     load, insertTrades, deleteTrade, deleteTrades, updateTrade, clearAll,
   }

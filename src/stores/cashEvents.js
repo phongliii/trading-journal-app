@@ -34,6 +34,7 @@ export const useCashEventsStore = defineStore('cashEvents', () => {
   // Shared only for the same portfolio — see lib/sharedLoad.js.
   const load = sharedLoad(() => accountsStore.activeAccountId, () => doLoad())
   let loadedFor = null // portfolio whose events are loaded (see reportLoadError)
+  const settledFor = ref(null) // portfolio whose load last finished, ok or not (Dashboard waits on it)
   async function doLoad() {
     loading.value = true
     const accountId = accountsStore.activeAccountId
@@ -52,6 +53,7 @@ export const useCashEventsStore = defineStore('cashEvents', () => {
       reportLoadError(toast, e, loadedFor === accountId, 'Could not load cash events from the cloud:',
         'Could not load your cash events from the cloud — try reloading the page.')
     } finally {
+      settledFor.value = accountId
       loading.value = false
     }
   }
@@ -85,5 +87,5 @@ export const useCashEventsStore = defineStore('cashEvents', () => {
     await saveToCloud()
   }
 
-  return { events, loading, loaded, load, mergeEvents, removeInRange, clearAll, RELEVANT_TYPES }
+  return { events, loading, loaded, settledFor, load, mergeEvents, removeInRange, clearAll, RELEVANT_TYPES }
 })
