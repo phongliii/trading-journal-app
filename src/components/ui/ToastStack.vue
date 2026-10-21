@@ -1,5 +1,7 @@
 <template>
-  <div class="fixed bottom-5 right-5 z-[100] flex flex-col gap-2 pointer-events-none">
+  <!-- Top layer: above the loading cover (z-9998) and modals (z-9999), so a
+       message is never hidden behind them. -->
+  <div class="fixed bottom-5 right-5 z-[10000] flex flex-col gap-2 pointer-events-none">
     <div v-for="t in toasts" :key="t.id"
       class="toast-anim pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-xl border shadow-xl text-sm font-medium min-w-[240px] max-w-sm"
       :class="styles[t.type]">

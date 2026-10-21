@@ -29,6 +29,8 @@
   "Chart image"; with text too it adds "(+ chart image)").
 
 ### Fixed
+- Toasts showed **under** the loading cover and dialogs; they now always sit
+  on top.
 - Charts no longer redraw after every step of an import, delete, restore,
   reset or portfolio switch — they wait until the action has finished (or
   failed) and draw once, with the final data. The same goes for data
