@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Changed
+- Journal: **+ Add section** only offers sections the note doesn't have yet
+  (e.g. no "Review" when the note already has Review or Week Review), and
+  disappears once every section is there. It also no longer shifts down
+  when the section list opens.
 - The trade **note icon** and the **Has note** filter also count a chart
   image: a trade with only a chart image now shows the icon (hover says
   "Chart image"; with text too it adds "(+ chart image)").

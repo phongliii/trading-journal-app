@@ -252,10 +252,12 @@
           </template>
         </draggable>
 
-          <div class="flex items-center gap-2 pt-2 flex-wrap">
-            <button @click="showAddSection = !showAddSection" class="text-xs text-ink-muted hover:text-ink transition-colors">+ Add section</button>
+          <div v-if="availablePresets.length" class="flex items-center gap-2 pt-2 flex-wrap">
+            <!-- Same box as the chips (border + py-1), so the row's height —
+                 and this button's position — doesn't change when they show. -->
+            <button @click="showAddSection = !showAddSection" class="text-xs border border-transparent py-1 text-ink-muted hover:text-ink transition-colors">+ Add section</button>
             <template v-if="showAddSection">
-              <button v-for="s in sectionPresets" :key="s.title" @click="addSection(s)"
+              <button v-for="s in availablePresets" :key="s.title" @click="addSection(s)"
                 class="text-xs border border-border rounded-full px-3 py-1 hover:bg-surface-2 text-ink-muted hover:text-ink transition-colors">
                 {{ s.emoji }} {{ s.title }}
               </button>
@@ -931,6 +933,19 @@ const sectionPresets = [
   { emoji: '😤', title: 'Emotions',   placeholder: 'How were you feeling?' },
   { emoji: '📋', title: 'Notes',      placeholder: 'Any other notes...' },
 ]
+
+// Only the sections this note doesn't have yet — "+ Add section" hides
+// itself once every one is there. Matched by title or by the section's id
+// ("review", "review_1729…"), so a weekly "Week Review" or "Key Lessons"
+// also counts as Review / Lessons.
+const availablePresets = computed(() => {
+  const have = new Set()
+  for (const sec of selected.value?.sections || []) {
+    have.add(sec.title.toLowerCase())
+    have.add(String(sec.id).split('_')[0].toLowerCase())
+  }
+  return sectionPresets.filter(p => !have.has(p.title.toLowerCase()))
+})
 
 const dayStats = computed(() => {
   if (!selected.value) return { pnl: 0, fees: 0, wins: 0, losses: 0, breakeven: 0, gross: 0, total: 0 }
