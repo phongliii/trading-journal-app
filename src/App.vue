@@ -311,6 +311,7 @@ watch(() => authStore.user?.id, (id) => {
 // need re-syncing here. Skipped on the very first load (prevId
 // undefined/null) since loadCloudDataSequence() above already covers
 // that case.
+const PAGES_WITH_SKELETON = new Set(['dashboard', 'trades'])
 watch(() => accountsStore.activeAccountId, async (id, prevId) => {
   if (!id || !prevId || id === prevId) return
   // Same reasoning as loadCloudData() above: this is about to force a
@@ -320,14 +321,20 @@ watch(() => accountsStore.activeAccountId, async (id, prevId) => {
   // data this switch is already fetching.
   markCloudRefreshed(ALL_CLOUD_STORES)
   switchingPortfolio = true
+  const loadAll = () => Promise.all([
+    tradesStore.load(),
+    balanceStore.load(),
+    cashEventsStore.load(),
+    journalStore.load(),
+    rawCsvArchiveStore.load(),
+  ])
   try {
-    await busy.run('Switching portfolio…', () => Promise.all([
-      tradesStore.load(),
-      balanceStore.load(),
-      cashEventsStore.load(),
-      journalStore.load(),
-      rawCsvArchiveStore.load(),
-    ]))
+    // Dashboard and Trades show their own loading placeholder until the new
+    // portfolio's data is in — a cover on top of that is one too many. Other
+    // pages have no placeholder, so they keep the cover rather than showing
+    // the old portfolio's data for a moment.
+    if (PAGES_WITH_SKELETON.has(route.name)) await loadAll()
+    else await busy.run('Switching portfolio…', loadAll)
   } finally {
     switchingPortfolio = false
   }

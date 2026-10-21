@@ -8,6 +8,12 @@
   it's merged.
 
 ### Changed
+- Switching portfolio on the **Dashboard** or **Trades** page shows just that
+  page's loading placeholder until the new portfolio's data is in, instead of
+  the "Switching portfolio…" cover on top of it. Other pages, which have no
+  placeholder, keep the cover. The Trades page's placeholder now also shows
+  after a switch (it used to show the old portfolio's trades until the new
+  ones arrived).
 - Settings → Fund Transactions lists every deposit/withdrawal with a
   **Status** column: **Approved**, **Declined** for a withdrawal the broker
   refunded, or **Refund** for that refund. Declined withdrawals and refunds
