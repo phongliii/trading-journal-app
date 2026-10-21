@@ -11,6 +11,7 @@ import { pushSettingsPatch } from '@/lib/cloudSettings'
 import { journalAdapter } from '@/lib/journalAdapter'
 import { useToast } from '@/composables/useToast'
 import { reportCloudError, reportLoadError, loadWithRetry } from '@/lib/cloudErrors'
+import { sharedLoad } from '@/lib/sharedLoad'
 
 // Exported (not just module-local) so lib/exportData.js can tell "still at
 // the factory default" apart from "the user actually customized this" when
@@ -162,8 +163,7 @@ export const useJournalStore = defineStore('journal', () => {
   // second redundant one. See whenLoaded() below.
   //
   // load() itself ALSO needs to reuse an in-flight call, not just let
-  // whenLoaded() observe one — without the `if (loadPromise) return
-  // loadPromise` guard below, two independent triggers calling load()
+  // whenLoaded() observe one — without sharing it (lib/sharedLoad.js), two independent triggers calling load()
   // close together (e.g. a route-navigation refresh and the entry-click
   // refresh in JournalView's refreshSelectedEntryFromCloud, each on its
   // own separate throttle) start two overlapping doLoad() runs. Both
@@ -176,11 +176,12 @@ export const useJournalStore = defineStore('journal', () => {
   // write landed) overwrote the later call's correct one. Coalescing
   // into one shared promise means only one doLoad() is ever running at a
   // time, so there's nothing left to race.
-  let loadPromise = null
-  async function load() {
-    if (loadPromise) return loadPromise
-    loadPromise = doLoad().finally(() => { loadPromise = null })
-    return loadPromise
+  // Shared only for the same portfolio — see lib/sharedLoad.js.
+  const sharedJournalLoad = sharedLoad(() => accountsStore.activeAccountId, () => doLoad())
+  let lastLoad = null // for whenLoaded()
+  function load() {
+    lastLoad = sharedJournalLoad()
+    return lastLoad
   }
   let loadedFor = null // portfolio whose entries are loaded (see reportLoadError)
   async function doLoad() {
@@ -280,7 +281,7 @@ export const useJournalStore = defineStore('journal', () => {
   // in) — either way there's nothing further to wait for.
   async function whenLoaded() {
     if (loaded.value) return
-    if (loadPromise) await loadPromise
+    if (lastLoad) await lastLoad
   }
 
   function setChecklistQuestions(questions) {

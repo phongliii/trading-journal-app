@@ -4,6 +4,7 @@ import { cashEventsAdapter } from '@/lib/cashEventsAdapter'
 import { useAccountsStore } from './accounts'
 import { useToast } from '@/composables/useToast'
 import { reportCloudError, reportLoadError, loadWithRetry } from '@/lib/cloudErrors'
+import { sharedLoad } from '@/lib/sharedLoad'
 
 const RELEVANT_TYPES = new Set(['Exchange Fee', 'Clearing Fee', 'Nfa Fee', 'Commission', 'Trade Paired', 'Fund Transaction'])
 
@@ -30,12 +31,8 @@ export const useCashEventsStore = defineStore('cashEvents', () => {
   // network requests and two redundant re-renders for one page visit —
   // this is the "dashboard fetches data too many times" symptom, since
   // Dashboard is the page that reads trades/balance/cashEvents together.
-  let loadPromise = null
-  async function load() {
-    if (loadPromise) return loadPromise
-    loadPromise = doLoad().finally(() => { loadPromise = null })
-    return loadPromise
-  }
+  // Shared only for the same portfolio — see lib/sharedLoad.js.
+  const load = sharedLoad(() => accountsStore.activeAccountId, () => doLoad())
   let loadedFor = null // portfolio whose events are loaded (see reportLoadError)
   async function doLoad() {
     loading.value = true

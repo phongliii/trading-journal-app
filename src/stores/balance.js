@@ -6,6 +6,7 @@ import { balanceAdapter } from '@/lib/balanceAdapter'
 import { useToast } from '@/composables/useToast'
 import { reportCloudError, reportLoadError, loadWithRetry } from '@/lib/cloudErrors'
 import { computeCorrectStarting, computeCurrentBalance, mergeFundTransactions, withoutCancelledWithdrawals } from '@/lib/balance'
+import { sharedLoad } from '@/lib/sharedLoad'
 
 // Cloud-only now (see lib/balanceAdapter.js) — no localStorage copy. `data`
 // starts empty and is populated by load() (called from App.vue once
@@ -35,12 +36,8 @@ export const useBalanceStore = defineStore('balance', () => {
   // network requests and two redundant re-renders for one page visit —
   // this is the "dashboard fetches data too many times" symptom, since
   // Dashboard is the page that reads trades/balance/cashEvents together.
-  let loadPromise = null
-  async function load() {
-    if (loadPromise) return loadPromise
-    loadPromise = doLoad().finally(() => { loadPromise = null })
-    return loadPromise
-  }
+  // Shared only for the same portfolio — see lib/sharedLoad.js.
+  const load = sharedLoad(() => accountsStore.activeAccountId, () => doLoad())
   let loadedFor = null // portfolio whose data is in `data` (see reportLoadError)
   async function doLoad() {
     loading.value = true

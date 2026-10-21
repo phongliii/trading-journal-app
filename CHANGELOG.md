@@ -23,6 +23,10 @@
   "Chart image"; with text too it adds "(+ chart image)").
 
 ### Fixed
+- **Switching portfolio could keep showing the old one's data.** If a
+  background refresh of the old portfolio was still running, the switch
+  reused that load instead of loading the new portfolio. Loads are now only
+  shared between callers asking for the same portfolio.
 - An occasional **"Could not load your balance from the cloud"** message
   (also cash events, journal, CSV backup), usually on returning to the tab
   with the data already on screen. Loads now get the signed-in user from the
