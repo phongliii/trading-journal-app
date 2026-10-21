@@ -288,33 +288,43 @@ async function confirmClearTrades() {
   if (!await $confirm({ title, message, confirmLabel: 'Delete', danger: true })) return
 
   // Several cloud deletes in a row — the loading cover waits for all of them.
-  await busy.run('Deleting trades…', async () => {
-    if (isFiltered) {
-      // One batch delete instead of one deleteTrade() call per trade — a loop
-      // here rewrites the whole trades array to localStorage on every single
-      // iteration, which is the "modal won't close / page looks frozen" bug.
-      await tradesStore.deleteTrades(tradesToClear.map(t => t.id))
-      // Clear fund transactions and cash events within the same date range
-      const start = rangeStart.value || filterDate.value
-      const end   = rangeEnd.value   || filterDate.value
-      await Promise.all([
-        balanceStore.setFundTransactions(balanceStore.fundTransactions.filter(t => t.date < start || t.date > end)),
-        cashEventsStore.removeInRange(start, end + 'T23:59:59'),
-      ])
-    } else {
-      await tradesStore.clearAll()
-      await Promise.all([
-        balanceStore.clearFundTransactions(),
-        cashEventsStore.clearAll(),
-        journalStore.clearWeeklyData(),
-      ])
-    }
-  })
+  let deleted = count
+  try {
+    await busy.run('Deleting trades…', async () => {
+      if (isFiltered) {
+        // One batch delete instead of one deleteTrade() call per trade — a loop
+        // here rewrites the whole trades array to localStorage on every single
+        // iteration, which is the "modal won't close / page looks frozen" bug.
+        deleted = await tradesStore.deleteTrades(tradesToClear.map(t => t.id))
+        // Clear fund transactions and cash events within the same date range.
+        // From the full saved list — fundTransactions leaves out declined
+        // withdrawals, and saving that back would wipe them outside the range too.
+        const start = rangeStart.value || filterDate.value
+        const end   = rangeEnd.value   || filterDate.value
+        await Promise.all([
+          balanceStore.setFundTransactions(balanceStore.allFundTransactions.filter(t => t.date < start || t.date > end)),
+          cashEventsStore.removeInRange(start, end + 'T23:59:59'),
+        ])
+      } else {
+        await tradesStore.clearAll()
+        await Promise.all([
+          balanceStore.clearFundTransactions(),
+          cashEventsStore.clearAll(),
+          journalStore.clearWeeklyData(),
+        ])
+      }
+    })
+  } catch (e) {
+    console.error('Delete trades failed:', e)
+    toast.error('Could not delete the trades. Try again.')
+    return
+  }
 
   filterDate.value = ''
   rangeStart.value = ''
   rangeEnd.value   = ''
-  toast.success(`Cleared ${count} trade${count !== 1 ? 's' : ''}`)
+  if (deleted < count) toast.warn(`Only ${deleted} of ${count} trades were deleted — try again for the rest.`)
+  else toast.success(`Deleted ${count} trade${count !== 1 ? 's' : ''}`)
 }
 const outcome  = ref('all')
 const withNote = ref(false) // "Has note" filter

@@ -29,6 +29,13 @@
   "Chart image"; with text too it adds "(+ chart image)").
 
 ### Fixed
+- **Deleting trades for a date range could silently not work** — the
+  "Cleared N trades" message showed but the trades came back (e.g. on the
+  next page). Big ranges (presets like This Month / Last 12 Months) are now
+  deleted in batches of 100; the message reports what the cloud actually
+  deleted (or an error if it failed); a background refresh that started
+  before a delete can no longer put the deleted trades back; and deleting a
+  range no longer drops saved declined withdrawals outside it.
 - **Dashboard charts redrew several times after switching portfolio**, once
   as each of trades, balance and cash history arrived (and briefly mixed the
   new portfolio's trades with the old one's balance). The Dashboard now shows

@@ -13,7 +13,7 @@
  *   saveTrades(trades)                  → Promise<void>
  *   insertTrades(newTrades, existing)   → Promise<{ all: Trade[], records: Trade[], inserted: number, updated: number, skipped: number }>
  *   deleteTrade(id, existing)           → Promise<Trade[]>  (returns the remaining trades)
- *   deleteTrades(ids, existing)         → Promise<Trade[]>  (batch form — use for more than one id)
+ *   deleteTrades(ids, existing)         → Promise<{ remaining: Trade[], deleted: number }>  (batch form; `deleted` = rows the cloud actually removed)
  *   updateTrade(id, patch, existing)    → Promise<Trade[]>  (returns the updated trades)
  *   clearAll()                          → Promise<void>
  */

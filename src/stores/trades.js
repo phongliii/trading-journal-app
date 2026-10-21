@@ -43,10 +43,17 @@ export const useTradesStore = defineStore('trades', () => {
   // Dashboard is the page that reads trades/balance/cashEvents together.
   // Shared only for the same portfolio — see lib/sharedLoad.js.
   const load = sharedLoad(() => accountsStore.activeAccountId, () => doLoad())
+  // Bumped by every change made here (import, edit, delete). A load that
+  // started before a change finishes with the cloud's state from BEFORE it,
+  // so its result is dropped — otherwise a background refresh landing just
+  // after a delete put the deleted trades back on screen.
+  let changes = 0
+
   async function doLoad() {
     loading.value = true
     error.value   = null
     const accountId = accountsStore.activeAccountId
+    const changesAtStart = changes
     try {
       // Fill in a missing duration from the open/close times. Done on the
       // fresh rows BEFORE comparing: it's display-only and never saved
@@ -54,6 +61,7 @@ export const useTradesStore = defineStore('trades', () => {
       // against already-filled ones made every reload look "changed" and
       // redrew every chart on each tab focus / page change.
       const fresh = (await adapter.loadTrades(accountId)).map(withDuration)
+      if (changes !== changesAtStart) return
       // Skip reassigning when a reload returns exactly what's already
       // here — every background refresh (navigation, tab focus; see
       // lib/cloudSync.js) is a real possibility even when nothing has
@@ -70,6 +78,7 @@ export const useTradesStore = defineStore('trades', () => {
 
   async function insertTrades(newTrades) {
     loading.value = true
+    changes++
     try {
       const result = await adapter.insertTrades(newTrades, trades.value, accountsStore.activeAccountId)
       // Use the adapter's own merged list rather than prepending records to
@@ -82,18 +91,25 @@ export const useTradesStore = defineStore('trades', () => {
   }
 
   async function deleteTrade(id) {
+    changes++
     trades.value = await adapter.deleteTrade(id, trades.value)
   }
 
+  // Returns how many the cloud actually deleted.
   async function deleteTrades(ids) {
-    trades.value = await adapter.deleteTrades(ids, trades.value)
+    changes++
+    const { remaining, deleted } = await adapter.deleteTrades(ids, trades.value)
+    trades.value = remaining
+    return deleted
   }
 
   async function updateTrade(id, patch) {
+    changes++
     trades.value = await adapter.updateTrade(id, patch, trades.value)
   }
 
   async function clearAll() {
+    changes++
     await adapter.clearAll(accountsStore.activeAccountId)
     trades.value = []
   }
