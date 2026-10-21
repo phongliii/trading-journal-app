@@ -23,6 +23,17 @@
   "Chart image"; with text too it adds "(+ chart image)").
 
 ### Fixed
+- **Balance missed account fees** that aren't trading, e.g. a $35 "Dormant
+  Fee" charged for an inactive month — the app's balance was higher than the
+  broker's by their total. They're now read from Cash History and count in
+  the balance (not in trading P&L or stats). On the chart the day gets a grey
+  dot and a hover line like "Dormant Fee -$35.00"; Settings lists them with
+  status **Charged**. Re-import Cash History once to pick up past ones.
+- Trading fees: when the broker's Transaction ID counter jumped in the middle
+  of a fill's fee rows, the rows after the jump weren't found, so those
+  trades showed too little in fees (and too much net P&L). Missing fee rows
+  are now also matched by the fill's time and contract. In one real account
+  this was $1.23 over 3 trades; every other trade was unchanged.
 - Deposits/withdrawals: a **withdrawal that wasn't approved** (the broker
   refunds it with a deposit of the same amount, Transaction ID + 1) showed as
   a withdrawal and a deposit — on the Balance chart, in Settings, and it

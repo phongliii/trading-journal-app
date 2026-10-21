@@ -206,27 +206,32 @@ export function parseCSV(text) {
  * Parse Cash_History fee rows into Map<txnId, amount>, plus the per-contract
  * fee rate (sum of each fee type's smallest observed row — fee rows scale
  * linearly with the fill's contract count, so the smallest row for a given
- * type is the 1-contract case). The rate is a fallback for fillFees() below,
+ * type is the 1-contract case). The rate is a fallback in feesByFill() below,
  * for fills whose own fee rows are entirely missing from this export.
  */
 function parseCashHistory(text) {
   const lines = text.trim().split(/\r?\n/)
-  if (!lines.length) return { feeByTxnId: new Map(), perContractRate: 0 }
+  if (!lines.length) return { feeByTxnId: new Map(), feeRowsByTime: new Map(), perContractRate: 0 }
 
   const FEE_TYPES = new Set(['Exchange Fee', 'Clearing Fee', 'Nfa Fee', 'Commission'])
   const firstCols = splitLine(lines[0], ',').map(c => c.trim().replace(/^"|"$/g, ''))
   const hasHeader = isNaN(Number(firstCols[0]))
 
-  let idxTxnId, idxDelta, idxType
+  let idxTxnId, idxDelta, idxType, idxTs, idxContract
   if (hasHeader) {
-    idxTxnId = firstCols.findIndex(h => h === 'Transaction ID')
-    idxDelta = firstCols.findIndex(h => h === 'Delta')
-    idxType  = firstCols.findIndex(h => h === 'Cash Change Type' || h === 'Type')
+    idxTxnId    = firstCols.findIndex(h => h === 'Transaction ID')
+    idxDelta    = firstCols.findIndex(h => h === 'Delta')
+    idxType     = firstCols.findIndex(h => h === 'Cash Change Type' || h === 'Type')
+    idxTs       = firstCols.findIndex(h => h === 'Timestamp')
+    idxContract = firstCols.findIndex(h => h === 'Contract')
   } else {
-    idxTxnId = 1; idxDelta = 4; idxType = 6
+    idxTxnId = 1; idxDelta = 4; idxType = 6; idxTs = 2; idxContract = 8
   }
 
   const feeByTxnId = new Map()
+  // Fee rows by "timestamp|contract" — for fills whose rows are split by a
+  // jump in the Transaction ID counter (see feesByFill).
+  const feeRowsByTime = new Map()
   const minByType = new Map()
   const dataLines = hasHeader ? lines.slice(1) : lines
 
@@ -237,42 +242,72 @@ function parseCashHistory(text) {
     if (!FEE_TYPES.has(type)) continue
     const txnId = parseInt(cols[idxTxnId])
     const amount = Math.abs(parseNum(cols[idxDelta]) || 0)
-    if (!isNaN(txnId) && amount > 0) feeByTxnId.set(txnId, amount)
+    if (!isNaN(txnId) && amount > 0) {
+      feeByTxnId.set(txnId, amount)
+      const key = `${(cols[idxTs] || '').trim()}|${(cols[idxContract] || '').trim()}`
+      if (!feeRowsByTime.has(key)) feeRowsByTime.set(key, [])
+      feeRowsByTime.get(key).push({ id: txnId, type, amount })
+    }
     if (amount > 0 && (!minByType.has(type) || amount < minByType.get(type))) minByType.set(type, amount)
   }
 
   let perContractRate = 0
   for (const v of minByType.values()) perContractRate += v
 
-  return { feeByTxnId, perContractRate }
+  return { feeByTxnId, feeRowsByTime, perContractRate }
 }
 
 /**
- * Get total fees for a fill by finding first 4 fee rows within +10 offsets.
- * Fee amounts already scale with qty (broker charges qty×rate per row).
- * Search up to +10 to handle cases where broker skips transaction IDs.
+ * Total fees per fill ID: { fillId → $ }. A fill has 4 fee rows (exchange,
+ * clearing, NFA, commission) whose amounts already scale with its qty.
  *
- * Some fills' fee rows are missing from the export entirely rather than
- * merely offset — seen when the exchange-wide Transaction ID counter jumps
- * by millions between two fills seconds apart (fill IDs are a shared,
- * exchange-wide sequence, not per-account), so the broker's export window
- * for this account skips right over that fill's own fee rows. Offset search
- * alone can never bridge a gap that size, so when NOTHING is found for a
- * fill, fall back to its expected qty × the per-contract rate derived from
- * the rest of the file, instead of silently treating that side as fee-free
- * (which understates fees — and overstates net P&L — for that fill).
+ * 1. By ID: the first 4 fee rows within +10 of the fill ID (the broker can
+ *    skip a few IDs).
+ * 2. By time: the Transaction ID counter is exchange-wide and sometimes
+ *    jumps by millions in the middle of a fill's rows (seen: two rows at
+ *    …97999/…98000, the other two at 169403080xx). A fill still missing
+ *    some fee types takes them from unclaimed fee rows with the same
+ *    timestamp and contract.
+ * 3. Estimate: a fill with no rows found at all gets qty × the per-contract
+ *    rate derived from the rest of the file, rather than $0 (which would
+ *    understate fees and overstate net P&L).
+ *
+ * fills: Map fillId → { qty, ts, contract }.
  */
-function fillFees(fillId, feeByTxnId, expectedQty, perContractRate) {
-  const id = parseInt(fillId)
-  if (isNaN(id)) return 0
-  let total = 0, found = 0
-  for (let i = 1; i <= 10; i++) {
-    const amt = feeByTxnId.get(id + i)
-    if (amt !== undefined) { total += amt; found++ }
-    if (found === 4) break
+function feesByFill(fills, { feeByTxnId, feeRowsByTime, perContractRate }) {
+  const used = new Set()
+  const found = new Map() // fillId → { total, types: Set }
+  for (const [fillId] of fills) {
+    const id = parseInt(fillId)
+    const f = { total: 0, types: new Set() }
+    found.set(fillId, f)
+    if (isNaN(id)) continue
+    for (let i = 1; i <= 10 && f.types.size < 4; i++) {
+      const amt = feeByTxnId.get(id + i)
+      if (amt === undefined || used.has(id + i)) continue
+      used.add(id + i); f.total += amt; f.types.add(id + i)
+    }
   }
-  if (found === 0 && expectedQty > 0) return perContractRate * expectedQty
-  return total
+  // Which fee type each matched row was — for "missing types" below.
+  const typeOf = new Map()
+  for (const rows of feeRowsByTime.values()) for (const r of rows) typeOf.set(r.id, r.type)
+  const have = new Map([...found].map(([fillId, f]) => [fillId, new Set([...f.types].map(id => typeOf.get(id)))]))
+  // Fills that already matched some rows by ID go first, so a fill at the
+  // same second that matched none can't take the rows they're missing.
+  const incomplete = [...fills.keys()].filter(fillId => have.get(fillId).size < 4)
+    .sort((a, b) => have.get(b).size - have.get(a).size)
+  for (const fillId of incomplete) {
+    const { ts, contract } = fills.get(fillId), f = found.get(fillId), types = have.get(fillId)
+    for (const r of feeRowsByTime.get(`${ts}|${contract}`) || []) {
+      if (used.has(r.id) || types.has(r.type)) continue
+      used.add(r.id); types.add(r.type); f.total += r.amount
+    }
+  }
+  const result = new Map()
+  for (const [fillId, { qty }] of fills) {
+    result.set(fillId, have.get(fillId).size === 0 && qty > 0 ? perContractRate * qty : found.get(fillId).total)
+  }
+  return result
 }
 
 export function parseDualCSV(positionText, cashText) {
@@ -288,7 +323,7 @@ export function parseDualCSV(positionText, cashText) {
   const posHeaders = Object.keys(posRows[0])
   const hasFillIdCols = posHeaders.includes('Buy Fill ID') || posHeaders.includes('Sell Fill ID')
   const hasSymbolCol  = posHeaders.includes('Contract') || posHeaders.includes('symbol')
-  // Fill IDs are how fees get matched to a trade at all (fillFees below) —
+  // Fill IDs are how fees get matched to a trade at all (feesByFill below) —
   // without either them or a symbol column, this isn't recognizable as a
   // Position_History export, so reject it instead of producing trades with
   // no fees and "UNKNOWN" symbols across the board.
@@ -301,7 +336,7 @@ export function parseDualCSV(positionText, cashText) {
   // A row with no symbol, no fill IDs, and no P/L is very likely a stray
   // blank/trailer line rather than a real fill — drop it before it reaches
   // the fee pre-computation below (where it would otherwise contribute a
-  // bogus 0-qty entry to fillTotalQty).
+  // bogus 0-qty fill to `fills`).
   const cleanPosRows = posRows.filter(row => {
     const blank = !(row['Contract'] || row['symbol']) &&
       !(row['Buy Fill ID'] || row['Sell Fill ID']) &&
@@ -314,8 +349,8 @@ export function parseDualCSV(positionText, cashText) {
   // No Cash History at all (a Position-only import with nothing saved to
   // take fees from) → trades with $0 fees. A Cash file WITH no fee rows is
   // still rejected — that's the wrong file, not a missing one.
-  const { feeByTxnId, perContractRate } = cashText ? parseCashHistory(cashText) : { feeByTxnId: new Map(), perContractRate: 0 }
-  if (cashText && !feeByTxnId.size) {
+  const cashFees = cashText ? parseCashHistory(cashText) : { feeByTxnId: new Map(), feeRowsByTime: new Map(), perContractRate: 0 }
+  if (cashText && !cashFees.feeByTxnId.size) {
     errors.push('Cash_History.csv is empty or no fee rows found')
     return { trades: [], fundTransactions: [], cashEvents: [], errors, warnings }
   }
@@ -326,13 +361,19 @@ export function parseDualCSV(positionText, cashText) {
   // Extract raw chronological cash events for drawdown/peak equity
   const cashEvents = cashText ? parseCashEvents(cashText) : []
 
-  // Pre-compute total Paired Qty per fill ID (for proportional splitting)
-  const fillTotalQty = new Map()
+  // Every fill with its total Paired Qty (fees are split by qty), time and
+  // contract, then each fill's total fees.
+  const fills = new Map()
   for (const row of cleanPosRows) {
     const qty = parseInt(row['Paired Qty'] || row['qty'] || '1') || 1
-    fillTotalQty.set(row['Buy Fill ID'],  (fillTotalQty.get(row['Buy Fill ID'])  || 0) + qty)
-    fillTotalQty.set(row['Sell Fill ID'], (fillTotalQty.get(row['Sell Fill ID']) || 0) + qty)
+    const contract = (row['Contract'] || '').trim()
+    for (const [fillId, ts] of [[row['Buy Fill ID'], row['Bought Timestamp']], [row['Sell Fill ID'], row['Sold Timestamp']]]) {
+      const f = fills.get(fillId) || { qty: 0, ts: (ts || '').trim(), contract }
+      f.qty += qty
+      fills.set(fillId, f)
+    }
   }
+  const fillFeeTotal = feesByFill(fills, cashFees)
 
   const trades = cleanPosRows.map(row => {
     const symbol    = (row['Contract'] || row['symbol'] || 'UNKNOWN').trim()
@@ -350,11 +391,11 @@ export function parseDualCSV(positionText, cashText) {
     const buyFillId  = row['Buy Fill ID']  || ''
     const sellFillId = row['Sell Fill ID'] || ''
 
-    const buyTotalQty  = fillTotalQty.get(buyFillId)  || qty
-    const sellTotalQty = fillTotalQty.get(sellFillId) || qty
+    const buyTotalQty  = fills.get(buyFillId)?.qty  || qty
+    const sellTotalQty = fills.get(sellFillId)?.qty || qty
 
-    const bf = fillFees(buyFillId,  feeByTxnId, buyTotalQty,  perContractRate) * qty / buyTotalQty
-    const sf = fillFees(sellFillId, feeByTxnId, sellTotalQty, perContractRate) * qty / sellTotalQty
+    const bf = (fillFeeTotal.get(buyFillId)  || 0) * qty / buyTotalQty
+    const sf = (fillFeeTotal.get(sellFillId) || 0) * qty / sellTotalQty
 
     const fees    = Math.round((bf + sf) * 100) / 100
     const net_pnl = Math.round((gross_pnl - fees) * 100) / 100
@@ -422,8 +463,14 @@ export function parseBalanceHistory(text) {
   return { rawStarting, earliestBalanceDate, errors: [] }
 }
 
+// Cash History rows that belong to trades (fees, P&L) — everything else
+// that moves money is a deposit/withdrawal or an account charge.
+const TRADING_CASH_TYPES = new Set(['Exchange Fee', 'Clearing Fee', 'Nfa Fee', 'Commission', 'Trade Paired'])
+
 /**
- * Extract Fund Transaction rows from Cash_History
+ * Extract Fund Transaction rows from Cash_History, plus account charges or
+ * credits that aren't trading (type 'fee' / 'credit', with the broker's
+ * `label`, e.g. "Dormant Fee")
  * Returns [{ date: 'yyyy-MM-dd', amount: number, type: 'deposit'|'withdrawal' }]
  */
 const RELEVANT_EVENT_TYPES = new Set(['Exchange Fee', 'Clearing Fee', 'Nfa Fee', 'Commission', 'Trade Paired', 'Fund Transaction'])
@@ -484,17 +531,23 @@ export function parseFundTransactions(cashText) {
     if (!line.trim()) continue
     const cols = splitLine(line, ',').map(c => c.trim().replace(/^"|"$/g, ''))
     const type = (cols[idxType] || '').trim()
-    if (type !== 'Fund Transaction') continue
+    if (TRADING_CASH_TYPES.has(type)) continue
     const amount = parseNum(cols[idxDelta]) || 0
     const date   = cols[idxDate] || ''
     if (!date) continue
+    const isFund = type === 'Fund Transaction'
+    // Any other row is an account charge or credit that isn't trading,
+    // e.g. a $35 "Dormant Fee" for an inactive month — it changes the
+    // balance, so it's kept (labelled with the broker's own name for it).
+    if (!isFund && !amount) continue
     txns.push({
       // The broker's Transaction ID — what tells two same-day, same-amount
       // deposits/withdrawals apart (see mergeFundTransactions).
       id: (idxTxnId >= 0 && cols[idxTxnId]) || null,
       date,
       amount,
-      type: amount >= 0 ? 'deposit' : 'withdrawal',
+      type: isFund ? (amount >= 0 ? 'deposit' : 'withdrawal') : (amount < 0 ? 'fee' : 'credit'),
+      ...(isFund ? {} : { label: type }),
     })
   }
   return txns

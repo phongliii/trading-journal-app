@@ -195,6 +195,38 @@ describe('parseDualCSV (Position_History + Cash_History)', () => {
   })
 })
 
+describe('parseDualCSV fee matching across a Transaction ID jump', () => {
+  // Real case (Jun 23): one 3-contract buy fill (covering shorts) whose 4
+  // fee rows straddle a jump in the broker's ID counter — two right after
+  // the fill ID, two ~295M later, all at the fill's own time and contract.
+  const pos = (sellTime) => csv(
+    'Pair ID,Buy Fill ID,Sell Fill ID,Paired Qty,Contract,Buy Price,Sell Price,P/L,Bought Timestamp,Sold Timestamp',
+    `1,16644997998,100,1,MNQU6,30002.00,30006.75,$9.50,06/23/2026 01:49:23,${sellTime}`,
+    `2,16644997998,200,1,MNQU6,30002.00,30007.50,$11.00,06/23/2026 01:49:23,${sellTime}`,
+    `3,16644997998,300,1,MNQU6,30002.00,30003.25,$2.50,06/23/2026 01:49:23,${sellTime}`,
+  )
+  const CASH = csv(
+    'Account,Transaction ID,Timestamp,Date,Delta,Amount,Cash Change Type,Currency,Contract',
+    '1,16644997999,06/23/2026 01:49:23,2026-06-23,-1.05,0, Exchange Fee,USD,MNQU6',
+    '1,16644998000,06/23/2026 01:49:23,2026-06-23,-0.57,0, Clearing Fee,USD,MNQU6',
+    '1,16940308002,06/23/2026 01:49:23,2026-06-23,-0.06,0, Nfa Fee,USD,MNQU6',
+    '1,16940308003,06/23/2026 01:49:23,2026-06-23,-1.17,0, Commission,USD,MNQU6',
+  )
+  // Buy fill: all 4 rows, $2.85 / 3 contracts = $0.95 each (it was $1.62 / 3
+  // = $0.54 when the rows after the jump were missed). Sell fills 100/200/300
+  // have no rows here → the per-contract estimate, which is also $2.85.
+
+  it('picks up the fee rows after the jump by time + contract', () => {
+    const { trades } = parseDualCSV(pos('06/23/2026 01:48:49'), CASH)
+    expect(trades.map(t => t.fees)).toEqual([3.8, 3.8, 3.8])
+  })
+
+  it("doesn't let another fill at the same second take them", () => {
+    const { trades } = parseDualCSV(pos('06/23/2026 01:49:23'), CASH)
+    expect(trades.map(t => t.fees)).toEqual([3.8, 3.8, 3.8])
+  })
+})
+
 describe('parseFundTransactions / parseCashEvents', () => {
   it('returns nothing when there are no matching rows', () => {
     const text = csv('Transaction ID,Timestamp,Date,Delta,Cash Change Type', '1,10/05/2026 09:00:00,2026-10-05,5,Trade Paired')
