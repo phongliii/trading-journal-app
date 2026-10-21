@@ -8,6 +8,10 @@
   it's merged.
 
 ### Changed
+- Settings → Fund Transactions lists every deposit/withdrawal with a
+  **Status** column: **Approved**, **Declined** for a withdrawal the broker
+  refunded, or **Refund** for that refund. Declined withdrawals and refunds
+  are struck through and still not counted anywhere.
 - Journal: **+ Add section** only offers sections the note doesn't have yet
   (e.g. no "Review" when the note already has Review or Week Review), and
   disappears once every section is there. It also no longer shifts down

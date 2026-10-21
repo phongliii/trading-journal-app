@@ -66,7 +66,7 @@
       </div>
       <div class="p-5 space-y-4">
         <!-- No fund transactions hint -->
-        <div v-if="!balanceStore.fundTransactions.length" class="flex items-center gap-3 bg-brand/5 border border-brand/20 rounded-lg px-4 py-3">
+        <div v-if="!balanceStore.allFundTransactions.length" class="flex items-center gap-3 bg-brand/5 border border-brand/20 rounded-lg px-4 py-3">
           <svg class="w-4 h-4 text-brand flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
           </svg>
@@ -75,18 +75,26 @@
 
         <!-- Fund transactions list -->
         <div v-else class="bg-surface-3 rounded-lg overflow-hidden">
-          <div class="grid grid-cols-3 items-center px-3 py-2 border-b border-border">
+          <div class="grid grid-cols-4 items-center px-3 py-2 border-b border-border">
             <span class="text-2xs font-semibold uppercase tracking-wide text-ink-faint text-left">Date</span>
             <span class="text-2xs font-semibold uppercase tracking-wide text-ink-faint text-center">Type</span>
+            <span class="text-2xs font-semibold uppercase tracking-wide text-ink-faint text-center">Status</span>
             <span class="text-2xs font-semibold uppercase tracking-wide text-ink-faint text-right">Amount</span>
           </div>
           <div class="divide-y divide-border">
-            <div v-for="t in pagedFundTxns" :key="t.date + t.amount"
-              class="grid grid-cols-3 items-center px-3 py-2">
+            <div v-for="t in pagedFundTxns" :key="t.id || t.date + t.amount"
+              class="grid grid-cols-4 items-center px-3 py-2">
               <span class="text-xs text-ink-muted text-left">{{ t.date }}</span>
               <span class="text-xs font-mono font-semibold capitalize text-ink-muted text-center">{{ t.type }}</span>
-              <span class="font-mono text-xs font-semibold text-right" :class="t.amount >= 0 ? 'text-up' : 'text-down'">
-                {{ t.amount >= 0 ? '+' : '' }}${{ Math.abs(t.amount).toFixed(2) }}
+              <span class="text-center">
+                <TooltipWrap :tip="FUND_STATUS[t.status].tip">
+                  <span :class="FUND_STATUS[t.status].badge">{{ FUND_STATUS[t.status].label }}</span>
+                </TooltipWrap>
+              </span>
+              <!-- Not counted (a declined withdrawal or its refund): struck through -->
+              <span class="font-mono text-xs font-semibold text-right"
+                :class="t.status !== 'approved' ? 'text-ink-faint line-through' : t.amount >= 0 ? 'text-up' : 'text-down'">
+                {{ t.amount >= 0 ? '+' : '−' }}${{ Math.abs(t.amount).toFixed(2) }}
               </span>
             </div>
           </div>
@@ -467,6 +475,7 @@ import { useWithdrawReminderStore } from '@/stores/withdrawReminder'
 import { useTradeMetaStore } from '@/stores/tradeMeta'
 import { useAccountsStore } from '@/stores/accounts'
 import { useRawCsvArchiveStore } from '@/stores/rawCsvArchive'
+import { fundStatus } from '@/lib/balance'
 import { journalAdapter } from '@/lib/journalAdapter'
 import { clearCloudSettings } from '@/lib/cloudSettings'
 import { useToast }         from '@/composables/useToast'
@@ -642,11 +651,26 @@ const groupedTimezones = {
 
 const fundPage       = ref(0)
 const FUND_PAGE_SIZE = 3
+// Every saved deposit/withdrawal, newest first, with its status — a
+// withdrawal that wasn't approved and its refund are listed but not counted
+// anywhere else (see withoutCancelledWithdrawals).
+const FUND_STATUS = {
+  'approved': { label: 'Approved', badge: 'badge-up',   tip: 'Counted in your balance and on the chart.' },
+  'declined': { label: 'Declined', badge: 'badge-down', tip: 'The broker declined this withdrawal and refunded it, so it isn\'t counted.' },
+  'refund':   { label: 'Refund',   badge: 'badge-neutral', tip: 'Money back from a declined withdrawal, so neither is counted.' },
+}
+const fundRows = computed(() => {
+  const status = fundStatus(balanceStore.allFundTransactions)
+  return balanceStore.allFundTransactions
+    .map(t => ({ ...t, status: status.get(t) }))
+    // Same day: by Transaction ID, so a refund sits right above its withdrawal
+    .sort((a, b) => b.date.localeCompare(a.date) || String(b.id ?? '').localeCompare(String(a.id ?? ''), undefined, { numeric: true }))
+})
 const pagedFundTxns  = computed(() => {
-  const txns = [...balanceStore.fundTransactions].sort((a, b) => b.date.localeCompare(a.date))
+  const txns = fundRows.value
   return txns.slice(fundPage.value * FUND_PAGE_SIZE, (fundPage.value + 1) * FUND_PAGE_SIZE)
 })
-const fundTotalPages = computed(() => Math.ceil(balanceStore.fundTransactions.length / FUND_PAGE_SIZE))
+const fundTotalPages = computed(() => Math.ceil(fundRows.value.length / FUND_PAGE_SIZE))
 
 async function clearImageFolder() {
   if (!await $confirm({ title: 'Disconnect Chart Image Folder', message: 'You will need to choose a folder again to attach chart images. Existing images already saved will not be deleted.', confirmLabel: 'Disconnect', danger: true })) return
