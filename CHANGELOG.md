@@ -14,6 +14,10 @@
   "Chart image"; with text too it adds "(+ chart image)").
 
 ### Fixed
+- Balance chart: a deposit and a withdrawal on the same day were added
+  together, so the hover showed only the net (and "Deposit +$0.00" when they
+  cancelled out). Each is now listed on its own, and that day's dot is split
+  — green half for the deposit, amber half for the withdrawal.
 - Journal: **Remove** on a note section deleted it — and everything written
   in it — with one click. It now asks first when the section has content;
   an empty section is still removed straight away.

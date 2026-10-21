@@ -21,6 +21,31 @@ const tzStore = useTimezoneStore()
 
 Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip)
 
+// A day with both a deposit and a withdrawal gets a split dot: the point
+// itself is drawn in the deposit colour, and this paints its right half in
+// the withdrawal colour on top. Options: { indices: [dataIndex…], color }.
+const splitDotPlugin = {
+  id: 'splitFundDot',
+  afterDatasetsDraw(chart, _args, opts) {
+    if (!opts?.indices?.length) return
+    const points = chart.getDatasetMeta(0).data
+    const ctx = chart.ctx
+    ctx.save()
+    ctx.fillStyle = opts.color
+    for (const i of opts.indices) {
+      const pt = points[i]
+      if (!pt || pt.skip) continue
+      const r = (pt.options.radius || 0) + (pt.options.borderWidth || 0) / 2
+      ctx.beginPath()
+      ctx.moveTo(pt.x, pt.y)
+      ctx.arc(pt.x, pt.y, r, -Math.PI / 2, Math.PI / 2)
+      ctx.closePath()
+      ctx.fill()
+    }
+    ctx.restore()
+  },
+}
+
 const zeroLinePlugin = {
   id: 'zeroLine',
   afterDraw(chart) {
@@ -110,14 +135,19 @@ function makeConfig() {
   const color = isPos ? '#00c896' : '#ef4444'
 
   // Deposits/withdrawals per day → a marker on the line plus a hover note,
-  // so a withdrawal doesn't read as a losing day.
-  const fundByDay = {}
+  // so a withdrawal doesn't read as a losing day. Deposits and withdrawals
+  // are kept apart (not netted), so a day with both shows both.
+  const inByDay = {}, outByDay = {}
   for (const f of props.fundTransactions) {
-    if (f.date) fundByDay[f.date.slice(0, 10)] = (fundByDay[f.date.slice(0, 10)] || 0) + f.amount
+    if (!f.date) continue
+    const day = f.date.slice(0, 10), byDay = f.amount >= 0 ? inByDay : outByDay
+    byDay[day] = (byDay[day] || 0) + f.amount
   }
-  const fundOnDay = isoDates.map(iso => fundByDay[iso] ?? null)
+  const fundIn  = isoDates.map(iso => inByDay[iso] ?? null)
+  const fundOut = isoDates.map(iso => outByDay[iso] ?? null)
   const FUND_IN = '#00c896', FUND_OUT = '#f59e0b'
-  const markerColors = fundOnDay.map(a => (a === null ? color : a >= 0 ? FUND_IN : FUND_OUT))
+  const markerColors = isoDates.map((_, i) => (fundIn[i] !== null ? FUND_IN : fundOut[i] !== null ? FUND_OUT : color))
+  const splitDays = isoDates.flatMap((_, i) => (fundIn[i] !== null && fundOut[i] !== null ? [i] : []))
 
   // % in the tooltip: trading P&L ÷ money put in at that point. A withdrawal
   // lowers the money put in (so the same loss is a bigger %), a deposit
@@ -130,14 +160,14 @@ function makeConfig() {
 
   return {
     type: 'line',
-    plugins: [zeroLinePlugin],
+    plugins: [zeroLinePlugin, splitDotPlugin],
     data: {
       labels,
       datasets: [{
         data,
         borderColor: color,
         borderWidth: 1.5,
-        pointRadius: fundOnDay.map(a => (a === null ? 0 : 4)),
+        pointRadius: isoDates.map((_, i) => (fundIn[i] === null && fundOut[i] === null ? 0 : 4)),
         pointHoverRadius: 4,
         pointBackgroundColor: markerColors,
         pointBorderColor: markerColors,
@@ -159,6 +189,7 @@ function makeConfig() {
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: false },
+        splitFundDot: { indices: splitDays, color: FUND_OUT },
         tooltip: {
           enabled: false,
           external: tooltipHandler,
@@ -170,9 +201,11 @@ function makeConfig() {
               const main = pct === null || pct === undefined
                 ? dollar
                 : dollar + '  (' + (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%)'
-              const fund = fundOnDay[ctx.dataIndex]
-              if (fund === null) return main
-              return [main, (fund >= 0 ? 'Deposit +' : 'Withdrawal -') + fmt(Math.abs(fund))]
+              const lines = [main]
+              const dIn = fundIn[ctx.dataIndex], dOut = fundOut[ctx.dataIndex]
+              if (dIn !== null)  lines.push('Deposit +' + fmt(dIn))
+              if (dOut !== null) lines.push('Withdrawal -' + fmt(Math.abs(dOut)))
+              return lines.length > 1 ? lines : main
             }
           }
         }
