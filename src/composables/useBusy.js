@@ -19,10 +19,16 @@ const SHOW_AFTER = 250
 const state = ref({ visible: false, title: '', step: '', index: 0, total: 0 })
 let active = false
 
+// True for the whole of an action, cover shown or not. Charts (lib/useChart.js)
+// hold their drawing while it's set, so the several saves an action makes
+// don't each redraw them — they draw once, with the end result.
+export const busyRunning = ref(false)
+
 export function useBusy() {
   async function run(title, fn, { total = 0 } = {}) {
     if (active) return fn(() => {})
     active = true
+    busyRunning.value = true
     state.value = { visible: false, title, step: '', index: 0, total }
     const timer = setTimeout(() => { state.value = { ...state.value, visible: true } }, SHOW_AFTER)
     const step = label => { state.value = { ...state.value, step: label, index: state.value.index + 1 } }
@@ -31,6 +37,7 @@ export function useBusy() {
     } finally {
       clearTimeout(timer)
       active = false
+      busyRunning.value = false
       state.value = { ...state.value, visible: false }
     }
   }
