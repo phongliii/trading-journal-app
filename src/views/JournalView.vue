@@ -253,7 +253,9 @@
         </draggable>
 
           <div v-if="availablePresets.length" class="flex items-center gap-2 pt-2 flex-wrap">
-            <button @click="showAddSection = !showAddSection" class="text-xs text-ink-muted hover:text-ink transition-colors">+ Add section</button>
+            <!-- Same box as the chips (border + py-1), so the row's height —
+                 and this button's position — doesn't change when they show. -->
+            <button @click="showAddSection = !showAddSection" class="text-xs border border-transparent py-1 text-ink-muted hover:text-ink transition-colors">+ Add section</button>
             <template v-if="showAddSection">
               <button v-for="s in availablePresets" :key="s.title" @click="addSection(s)"
                 class="text-xs border border-border rounded-full px-3 py-1 hover:bg-surface-2 text-ink-muted hover:text-ink transition-colors">
