@@ -10,7 +10,7 @@ import {
 import { pushSettingsPatch } from '@/lib/cloudSettings'
 import { journalAdapter } from '@/lib/journalAdapter'
 import { useToast } from '@/composables/useToast'
-import { reportCloudError } from '@/lib/cloudErrors'
+import { reportCloudError, reportLoadError, loadWithRetry } from '@/lib/cloudErrors'
 
 // Exported (not just module-local) so lib/exportData.js can tell "still at
 // the factory default" apart from "the user actually customized this" when
@@ -182,6 +182,7 @@ export const useJournalStore = defineStore('journal', () => {
     loadPromise = doLoad().finally(() => { loadPromise = null })
     return loadPromise
   }
+  let loadedFor = null // portfolio whose entries are loaded (see reportLoadError)
   async function doLoad() {
     loading.value = true
     const accountId = accountsStore.activeAccountId
@@ -192,7 +193,7 @@ export const useJournalStore = defineStore('journal', () => {
       // portfolio's readList has no bearing on this one at all.
       let localRead = []
       try { localRead = JSON.parse(localStorage.getItem(readKeyFor(accountId)) || '[]') } catch { /* ignore */ }
-      const { data: cloudData, readList: cloudRead } = await journalAdapter.load(accountId)
+      const { data: cloudData, readList: cloudRead } = await loadWithRetry(() => journalAdapter.load(accountId))
       data.value = cloudData
 
       // Re-read localStorage now, right before merging, instead of only
@@ -259,8 +260,9 @@ export const useJournalStore = defineStore('journal', () => {
       }
 
       loaded.value = true
+      loadedFor = accountId
     } catch (e) {
-      reportCloudError(toast, e, 'Could not load journal entries from the cloud:',
+      reportLoadError(toast, e, loadedFor === accountId, 'Could not load journal entries from the cloud:',
         'Could not load your journal from the cloud — try reloading the page.')
     } finally {
       loading.value = false

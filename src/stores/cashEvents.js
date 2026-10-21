@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { cashEventsAdapter } from '@/lib/cashEventsAdapter'
 import { useAccountsStore } from './accounts'
 import { useToast } from '@/composables/useToast'
-import { reportCloudError } from '@/lib/cloudErrors'
+import { reportCloudError, reportLoadError, loadWithRetry } from '@/lib/cloudErrors'
 
 const RELEVANT_TYPES = new Set(['Exchange Fee', 'Clearing Fee', 'Nfa Fee', 'Commission', 'Trade Paired', 'Fund Transaction'])
 
@@ -36,10 +36,12 @@ export const useCashEventsStore = defineStore('cashEvents', () => {
     loadPromise = doLoad().finally(() => { loadPromise = null })
     return loadPromise
   }
+  let loadedFor = null // portfolio whose events are loaded (see reportLoadError)
   async function doLoad() {
     loading.value = true
+    const accountId = accountsStore.activeAccountId
     try {
-      const fresh = await cashEventsAdapter.load(accountsStore.activeAccountId)
+      const fresh = await loadWithRetry(() => cashEventsAdapter.load(accountId))
       // Same reasoning as trades.js's doLoad(): skip replacing `events`
       // when a reload comes back identical to what's already here, so an
       // unchanged background refresh doesn't hand drawdown/equity
@@ -48,8 +50,9 @@ export const useCashEventsStore = defineStore('cashEvents', () => {
       // unconditionally — this only ever skips the DATA reassignment.
       if (JSON.stringify(fresh) !== JSON.stringify(events.value)) events.value = fresh
       loaded.value = true
+      loadedFor = accountId
     } catch (e) {
-      reportCloudError(toast, e, 'Could not load cash events from the cloud:',
+      reportLoadError(toast, e, loadedFor === accountId, 'Could not load cash events from the cloud:',
         'Could not load your cash events from the cloud — try reloading the page.')
     } finally {
       loading.value = false

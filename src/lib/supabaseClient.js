@@ -31,7 +31,16 @@ export function getSupabase() {
 // local copy either way) — because every one of this function's callers
 // has nothing to fall back on without the cloud, so they need to know a
 // call failed, not have it silently do nothing.
+//
+// The id comes from the session supabase-js keeps locally (renewing its
+// token itself when it has expired) — no network call. auth.getUser() asks
+// the auth server every time — an extra request that can fail on a
+// background refresh right as the tab wakes up (likely behind occasional
+// "Could not load your balance…" toasts with the data already on screen). Row-level security on every
+// table still checks the token server-side, so this doesn't loosen access.
 export async function getUserId(sb) {
+  const { data: { session } } = await sb.auth.getSession()
+  if (session?.user?.id) return session.user.id
   const { data, error } = await sb.auth.getUser()
   if (error) throw error
   if (!data.user) throw new Error('Not signed in')

@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { rawCsvArchiveAdapter } from '@/lib/rawCsvArchiveAdapter'
 import { useAccountsStore } from './accounts'
 import { useToast } from '@/composables/useToast'
-import { reportCloudError } from '@/lib/cloudErrors'
+import { reportCloudError, reportLoadError, loadWithRetry } from '@/lib/cloudErrors'
 
 // Keeps the ORIGINAL broker CSV rows (exact columns, untouched) for
 // Position_History, Cash_History and Account_Balance_History, so a
@@ -52,13 +52,16 @@ export const useRawCsvArchiveStore = defineStore('rawCsvArchive', () => {
   const loaded  = ref(false)
   const toast = useToast()
 
+  let loadedFor = null // portfolio whose rows are loaded (see reportLoadError)
   async function load() {
     loading.value = true
+    const accountId = accountsStore.activeAccountId
     try {
-      data.value = await rawCsvArchiveAdapter.load(accountsStore.activeAccountId)
+      data.value = await loadWithRetry(() => rawCsvArchiveAdapter.load(accountId))
       loaded.value = true
+      loadedFor = accountId
     } catch (e) {
-      reportCloudError(toast, e, 'Could not load the raw CSV archive from the cloud:',
+      reportLoadError(toast, e, loadedFor === accountId, 'Could not load the raw CSV archive from the cloud:',
         'Could not load your backed-up CSV history from the cloud.')
     } finally {
       loading.value = false
