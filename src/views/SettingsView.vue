@@ -657,7 +657,7 @@ const FUND_PAGE_SIZE = 3
 const FUND_STATUS = {
   'approved': { label: 'Approved', badge: 'badge-up',   tip: 'Counted in your balance and on the chart.' },
   'declined': { label: 'Declined', badge: 'badge-down', tip: 'The broker declined this withdrawal and refunded it, so it isn\'t counted.' },
-  'refund':   { label: 'Declined', badge: 'badge-down', tip: 'Refund of a declined withdrawal. Not counted.' },
+  'refund':   { label: 'Refund',   badge: 'badge-neutral', tip: 'Money back from a declined withdrawal, so neither is counted.' },
 }
 const fundRows = computed(() => {
   const status = fundStatus(balanceStore.allFundTransactions)

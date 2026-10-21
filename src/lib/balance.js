@@ -78,7 +78,7 @@ function cancelledPairs(txns) {
 }
 
 // Status of each deposit/withdrawal: 'approved', 'declined' (a withdrawal
-// the broker refunded) or 'refund' (that refund — shown as Declined too).
+// the broker refunded) or 'refund' (that refund).
 export function fundStatus(txns) {
   const { withdrawals, refunds } = cancelledPairs(txns)
   return new Map(txns.map(t => [t, withdrawals.has(t) ? 'declined' : refunds.has(t) ? 'refund' : 'approved']))
