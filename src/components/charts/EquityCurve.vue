@@ -137,16 +137,25 @@ function makeConfig() {
   // Deposits/withdrawals per day → a marker on the line plus a hover note,
   // so a withdrawal doesn't read as a losing day. Deposits and withdrawals
   // are kept apart (not netted), so a day with both shows both.
-  const inByDay = {}, outByDay = {}
+  // Account fees/credits (e.g. a "Dormant Fee") are listed on their own,
+  // with the broker's name for them, and get a grey dot when they're the
+  // only thing that day.
+  const inByDay = {}, outByDay = {}, otherByDay = {}
   for (const f of props.fundTransactions) {
     if (!f.date) continue
-    const day = f.date.slice(0, 10), byDay = f.amount >= 0 ? inByDay : outByDay
+    const day = f.date.slice(0, 10)
+    if (f.type === 'fee' || f.type === 'credit') {
+      (otherByDay[day] ||= []).push(f)
+      continue
+    }
+    const byDay = f.amount >= 0 ? inByDay : outByDay
     byDay[day] = (byDay[day] || 0) + f.amount
   }
   const fundIn  = isoDates.map(iso => inByDay[iso] ?? null)
   const fundOut = isoDates.map(iso => outByDay[iso] ?? null)
-  const FUND_IN = '#00c896', FUND_OUT = '#f59e0b'
-  const markerColors = isoDates.map((_, i) => (fundIn[i] !== null ? FUND_IN : fundOut[i] !== null ? FUND_OUT : color))
+  const other   = isoDates.map(iso => otherByDay[iso] ?? null)
+  const FUND_IN = '#00c896', FUND_OUT = '#f59e0b', FEE = '#7a92b0'
+  const markerColors = isoDates.map((_, i) => (fundIn[i] !== null ? FUND_IN : fundOut[i] !== null ? FUND_OUT : other[i] ? FEE : color))
   const splitDays = isoDates.flatMap((_, i) => (fundIn[i] !== null && fundOut[i] !== null ? [i] : []))
 
   // % in the tooltip: trading P&L ÷ money put in at that point. A withdrawal
@@ -167,7 +176,7 @@ function makeConfig() {
         data,
         borderColor: color,
         borderWidth: 1.5,
-        pointRadius: isoDates.map((_, i) => (fundIn[i] === null && fundOut[i] === null ? 0 : 4)),
+        pointRadius: isoDates.map((_, i) => (fundIn[i] === null && fundOut[i] === null && !other[i] ? 0 : 4)),
         pointHoverRadius: 4,
         pointBackgroundColor: markerColors,
         pointBorderColor: markerColors,
@@ -205,6 +214,9 @@ function makeConfig() {
               const dIn = fundIn[ctx.dataIndex], dOut = fundOut[ctx.dataIndex]
               if (dIn !== null)  lines.push('Deposit +' + fmt(dIn))
               if (dOut !== null) lines.push('Withdrawal -' + fmt(Math.abs(dOut)))
+              for (const f of other[ctx.dataIndex] || []) {
+                lines.push((f.label || (f.type === 'fee' ? 'Account fee' : 'Account credit')) + ' ' + (f.amount < 0 ? '-' : '+') + fmt(Math.abs(f.amount)))
+              }
               return lines.length > 1 ? lines : main
             }
           }

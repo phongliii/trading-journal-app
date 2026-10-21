@@ -70,18 +70,20 @@ function cancelledPairs(txns) {
   const byId = new Map(txns.filter(t => t.id).map(t => [String(t.id), t]))
   const withdrawals = new Set(), refunds = new Set()
   for (const w of txns) {
-    if (!(w.amount < 0) || !/^\d+$/.test(String(w.id ?? ''))) continue
+    if (w.type !== 'withdrawal' || !/^\d+$/.test(String(w.id ?? ''))) continue
     const refund = byId.get(String(BigInt(w.id) + 1n))
-    if (refund && Math.abs(refund.amount + w.amount) < 0.005) { withdrawals.add(w); refunds.add(refund) }
+    if (refund?.type === 'deposit' && Math.abs(refund.amount + w.amount) < 0.005) { withdrawals.add(w); refunds.add(refund) }
   }
   return { withdrawals, refunds }
 }
 
-// Status of each deposit/withdrawal: 'approved', 'declined' (a withdrawal
-// the broker refunded) or 'refund' (that refund).
+// Status of each entry: 'approved', 'declined' (a withdrawal the broker
+// refunded), 'refund' (that refund) or 'charged' (an account fee/credit).
 export function fundStatus(txns) {
   const { withdrawals, refunds } = cancelledPairs(txns)
-  return new Map(txns.map(t => [t, withdrawals.has(t) ? 'declined' : refunds.has(t) ? 'refund' : 'approved']))
+  const status = t => withdrawals.has(t) ? 'declined' : refunds.has(t) ? 'refund'
+    : t.type === 'fee' || t.type === 'credit' ? 'charged' : 'approved'
+  return new Map(txns.map(t => [t, status(t)]))
 }
 
 // Drops withdrawals that weren't approved, with their refunds, so neither

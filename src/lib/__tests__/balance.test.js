@@ -119,12 +119,34 @@ describe('withoutCancelledWithdrawals', () => {
 describe('fundStatus', () => {
   it('marks the unapproved withdrawal and its refund, everything else approved', () => {
     const txns = [
-      { id: '20620479695', date: '2026-10-19', amount: -1000 },
-      { id: '20620479696', date: '2026-10-19', amount: -500 },   // next ID, but another withdrawal
-      { id: '20620487988', date: '2026-10-21', amount: -1000 },
-      { id: '20620487989', date: '2026-10-21', amount: 1000 },   // its refund
+      { id: '20620479695', date: '2026-10-19', amount: -1000, type: 'withdrawal' },
+      { id: '20620479696', date: '2026-10-19', amount: -500, type: 'withdrawal' },   // next ID, but another withdrawal
+      { id: '20620487988', date: '2026-10-21', amount: -1000, type: 'withdrawal' },
+      { id: '20620487989', date: '2026-10-21', amount: 1000, type: 'deposit' },      // its refund
+      { id: '17604193116', date: '2026-08-15', amount: -35, type: 'fee', label: 'Dormant Fee' },
     ]
     const s = fundStatus(txns)
-    expect(txns.map(t => s.get(t))).toEqual(['approved', 'approved', 'declined', 'refund'])
+    expect(txns.map(t => s.get(t))).toEqual(['approved', 'approved', 'declined', 'refund', 'charged'])
+  })
+})
+
+describe('account fees (e.g. Dormant Fee)', () => {
+  const CASH = [
+    'Account,Transaction ID,Timestamp,Date,Delta,Amount,Cash Change Type,Currency,Contract',
+    '1,12370420134,01/29/2026 17:01:33,2026-01-29,-35.00,64.60, Dormant Fee,USD,',
+    '1,20620483189,10/21/2026 08:42:55,2026-10-21,"1,000.00","1,763.72", Fund Transaction,USD,',
+    '1,20620483190,10/21/2026 08:43:00,2026-10-21,-0.35,"1,763.37", Exchange Fee,USD,MNQZ6',
+  ].join('\n')
+
+  it('are read from Cash History next to deposits/withdrawals, trading fees are not', () => {
+    expect(parseFundTransactions(CASH)).toEqual([
+      { id: '12370420134', date: '2026-01-29', amount: -35, type: 'fee', label: 'Dormant Fee' },
+      { id: '20620483189', date: '2026-10-21', amount: 1000, type: 'deposit' },
+    ])
+  })
+
+  it('reduce the balance', () => {
+    const data = { rawStarting: 99.6, earliestBalanceDate: '2026-01-03' }
+    expect(computeCurrentBalance(data, parseFundTransactions(CASH), [])).toBeCloseTo(1064.6)
   })
 })

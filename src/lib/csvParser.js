@@ -463,8 +463,14 @@ export function parseBalanceHistory(text) {
   return { rawStarting, earliestBalanceDate, errors: [] }
 }
 
+// Cash History rows that belong to trades (fees, P&L) — everything else
+// that moves money is a deposit/withdrawal or an account charge.
+const TRADING_CASH_TYPES = new Set(['Exchange Fee', 'Clearing Fee', 'Nfa Fee', 'Commission', 'Trade Paired'])
+
 /**
- * Extract Fund Transaction rows from Cash_History
+ * Extract Fund Transaction rows from Cash_History, plus account charges or
+ * credits that aren't trading (type 'fee' / 'credit', with the broker's
+ * `label`, e.g. "Dormant Fee")
  * Returns [{ date: 'yyyy-MM-dd', amount: number, type: 'deposit'|'withdrawal' }]
  */
 const RELEVANT_EVENT_TYPES = new Set(['Exchange Fee', 'Clearing Fee', 'Nfa Fee', 'Commission', 'Trade Paired', 'Fund Transaction'])
@@ -525,17 +531,23 @@ export function parseFundTransactions(cashText) {
     if (!line.trim()) continue
     const cols = splitLine(line, ',').map(c => c.trim().replace(/^"|"$/g, ''))
     const type = (cols[idxType] || '').trim()
-    if (type !== 'Fund Transaction') continue
+    if (TRADING_CASH_TYPES.has(type)) continue
     const amount = parseNum(cols[idxDelta]) || 0
     const date   = cols[idxDate] || ''
     if (!date) continue
+    const isFund = type === 'Fund Transaction'
+    // Any other row is an account charge or credit that isn't trading,
+    // e.g. a $35 "Dormant Fee" for an inactive month — it changes the
+    // balance, so it's kept (labelled with the broker's own name for it).
+    if (!isFund && !amount) continue
     txns.push({
       // The broker's Transaction ID — what tells two same-day, same-amount
       // deposits/withdrawals apart (see mergeFundTransactions).
       id: (idxTxnId >= 0 && cols[idxTxnId]) || null,
       date,
       amount,
-      type: amount >= 0 ? 'deposit' : 'withdrawal',
+      type: isFund ? (amount >= 0 ? 'deposit' : 'withdrawal') : (amount < 0 ? 'fee' : 'credit'),
+      ...(isFund ? {} : { label: type }),
     })
   }
   return txns

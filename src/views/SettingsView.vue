@@ -85,7 +85,7 @@
             <div v-for="t in pagedFundTxns" :key="t.id || t.date + t.amount"
               class="grid grid-cols-4 items-center px-3 py-2">
               <span class="text-xs text-ink-muted text-left">{{ t.date }}</span>
-              <span class="text-xs font-mono font-semibold capitalize text-ink-muted text-center">{{ t.type }}</span>
+              <span class="text-xs font-mono font-semibold capitalize text-ink-muted text-center">{{ t.label || t.type }}</span>
               <span class="text-center">
                 <TooltipWrap :tip="FUND_STATUS[t.status].tip">
                   <span :class="FUND_STATUS[t.status].badge">{{ FUND_STATUS[t.status].label }}</span>
@@ -93,7 +93,7 @@
               </span>
               <!-- Not counted (a declined withdrawal or its refund): struck through -->
               <span class="font-mono text-xs font-semibold text-right"
-                :class="t.status !== 'approved' ? 'text-ink-faint line-through' : t.amount >= 0 ? 'text-up' : 'text-down'">
+                :class="t.status === 'declined' || t.status === 'refund' ? 'text-ink-faint line-through' : t.amount >= 0 ? 'text-up' : 'text-down'">
                 {{ t.amount >= 0 ? '+' : '−' }}${{ Math.abs(t.amount).toFixed(2) }}
               </span>
             </div>
@@ -658,6 +658,7 @@ const FUND_STATUS = {
   'approved': { label: 'Approved', badge: 'badge-up',   tip: 'Counted in your balance and on the chart.' },
   'declined': { label: 'Declined', badge: 'badge-down', tip: 'The broker declined this withdrawal and refunded it, so it isn\'t counted.' },
   'refund':   { label: 'Refund',   badge: 'badge-neutral', tip: 'Money back from a declined withdrawal, so neither is counted.' },
+  'charged':  { label: 'Charged',  badge: 'badge-neutral', tip: 'An account fee or credit from your broker (not trading). Counted in your balance, not in your P&L.' },
 }
 const fundRows = computed(() => {
   const status = fundStatus(balanceStore.allFundTransactions)

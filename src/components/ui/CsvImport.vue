@@ -88,7 +88,7 @@ async function runImport() {
   await importFiles(files)
 }
 
-const plural = (n, word) => `${n} ${word}${n !== 1 ? 's' : ''}`
+const plural = (n, word, many = word + 's') => `${n} ${n !== 1 ? many : word}`
 
 // Imports any mix of the three files behind one confirm step. What a
 // Position-only or Cash-only import does is worked out by lib/tradeImport.js.
@@ -121,9 +121,14 @@ async function importFiles({ position, cash, balance }) {
 
     const adds = []
     if (plan?.newTradeCount) adds.push(plural(plan.newTradeCount, 'trade'))
-    // Unapproved withdrawals (and their refunds) aren't counted — see withoutCancelledWithdrawals.
-    const approvedFunds = plan ? withoutCancelledWithdrawals(plan.fundTransactions).length : 0
+    // Unapproved withdrawals (and their refunds) aren't counted — see
+    // withoutCancelledWithdrawals. Account fees (e.g. Dormant Fee) are listed apart.
+    const counted = plan ? withoutCancelledWithdrawals(plan.fundTransactions) : []
+    const isCharge = t => t.type === 'fee' || t.type === 'credit'
+    const approvedFunds = counted.filter(t => !isCharge(t)).length
+    const charges = counted.filter(isCharge).length
     if (approvedFunds) adds.push(plural(approvedFunds, 'fund transaction'))
+    if (charges) adds.push(plural(charges, 'account fee'))
     const lines = []
     if (adds.length) lines.push(`This will add ${adds.join(' and ')} to your journal.`)
     if (plan?.updateCount) lines.push(`${plural(plan.updateCount, 'trade')} you already have will be updated.`)
@@ -156,7 +161,7 @@ async function importFiles({ position, cash, balance }) {
           plan.fundTransactions.length ? balanceStore.mergeTransactions(plan.fundTransactions) : 0,
           plan.cashEvents.length ? cashEventsStore.mergeEvents(plan.cashEvents) : 0,
         ])
-        if (added > 0) toast.success(`${plural(added, 'fund transaction')} recorded`)
+        if (added > 0) toast.success(`${plural(added, 'deposit, withdrawal or fee', 'deposits, withdrawals or fees')} recorded`)
       }
 
       // Archive the original, untouched CSV rows (exact broker columns): later
