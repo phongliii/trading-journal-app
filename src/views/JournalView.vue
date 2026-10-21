@@ -239,7 +239,7 @@
           class="space-y-8"
           @end="persistEntry">
           <template #item="{ element: section }">
-            <div>
+            <div :data-section-id="section.id">
               <hr class="border-border/50 mb-4" />
               <div class="flex items-center gap-2 mb-3">
                 <span class="drag-handle text-ink-faint/50 hover:text-ink-faint cursor-grab active:cursor-grabbing select-none" title="Drag to reorder">⠿</span>
@@ -247,7 +247,7 @@
                 <h3 class="text-base font-bold text-ink">{{ section.title }}</h3>
                 <button @click="removeSection(section.id)" class="ml-auto text-2xs text-ink-faint hover:text-down transition-colors">Remove</button>
               </div>
-              <QuillEditor v-model="section.content" :placeholder="section.placeholder" @update:modelValue="persistEntry" />
+              <QuillEditor v-model="section.content" :placeholder="section.placeholder" :autofocus="section.id === justAddedSectionId" @update:modelValue="persistEntry" />
             </div>
           </template>
         </draggable>
@@ -539,6 +539,9 @@ watch(() => journalStore.loaded, (loaded, prevLoaded) => {
 })
 
 const showAddSection   = ref(false)
+const justAddedSectionId = ref(null) // its editor gets the cursor (addSection)
+// Only right after adding — not again when the note is reopened later.
+watch(() => selected.value?.key, () => { justAddedSectionId.value = null })
 const showYearModal    = ref(false) // Monthly tab only
 const showMonthModal   = ref(false) // Daily tab
 const showQuarterModal = ref(false) // Weekly tab
@@ -917,11 +920,18 @@ async function removeSection(id) {
   persistEntry()
 }
 
-function addSection(preset) {
+async function addSection(preset) {
   if (!selected.value) return
-  selected.value.sections.push({ id: preset.title.toLowerCase() + '_' + Date.now(), ...preset, content: '' })
+  const id = preset.title.toLowerCase() + '_' + Date.now()
+  selected.value.sections.push({ id, ...preset, content: '' })
   showAddSection.value = false
   persistEntry()
+  // Bring the new section into view with the cursor in it, ready to type —
+  // it's added at the end of the note, often below the fold. (Its editor
+  // takes the focus itself once ready: see QuillEditor's autofocus.)
+  justAddedSectionId.value = id
+  await nextTick()
+  document.querySelector(`[data-section-id="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
 
 const sectionPresets = [

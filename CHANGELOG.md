@@ -7,6 +7,8 @@
   (e.g. no "Review" when the note already has Review or Week Review), and
   disappears once every section is there. It also no longer shifts down
   when the section list opens.
+- Journal: a newly added section scrolls into view with the cursor already
+  in it, ready to type (it used to appear at the bottom, out of sight).
 - The trade **note icon** and the **Has note** filter also count a chart
   image: a trade with only a chart image now shows the icon (hover says
   "Chart image"; with text too it adds "(+ chart image)").
