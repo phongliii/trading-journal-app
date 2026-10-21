@@ -14,6 +14,7 @@ vi.mock('chart.js', () => ({
 
 const { useChart } = await import('../useChart.js')
 const { useBusy } = await import('@/composables/useBusy.js')
+const { holdDraws } = await import('../drawHold.js')
 
 let frames = []
 globalThis.requestAnimationFrame = fn => frames.push(fn)
@@ -54,6 +55,38 @@ describe('useChart', () => {
     useChart(ref({}), () => [data.value], () => ({ type: 'line', data: {}, options: {} }))
     await useBusy().run('Importing…', async () => { data.value = [1] })
     await flush()
+    expect(draws.updated).toBe(0)
+  })
+
+  it('draws once after a background refresh of several stores', async () => {
+    const trades = ref([1]); const balance = ref([1])
+    useChart(ref({}), () => [trades.value, balance.value], () => ({ type: 'line', data: {}, options: {} }))
+    await holdDraws(async () => {
+      trades.value = [1, 2]; await flush()
+      balance.value = [1, 2]; await flush()
+    })
+    await flush()
+    expect(draws.updated).toBe(1)
+  })
+
+  it('waits for the last of overlapping holds', async () => {
+    const data = ref([1])
+    useChart(ref({}), () => [data.value], () => ({ type: 'line', data: {}, options: {} }))
+    let endRefresh
+    const refresh = holdDraws(() => new Promise(r => { endRefresh = r }))
+    await useBusy().run('Importing…', async () => { data.value = [2] })
+    await flush()
+    expect(draws.updated).toBe(0)
+    endRefresh(); await refresh; await flush()
+    expect(draws.updated).toBe(1)
+  })
+
+  it('a chart opened during a hold draws straight away', async () => {
+    let endRefresh
+    const refresh = holdDraws(() => new Promise(r => { endRefresh = r }))
+    useChart(ref({}), () => [[1]], () => ({ type: 'line', data: {}, options: {} }))
+    expect(draws.created).toBe(1)
+    endRefresh(); await refresh; await flush()
     expect(draws.updated).toBe(0)
   })
 })

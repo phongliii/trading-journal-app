@@ -8,9 +8,10 @@
 //   3. A real change → the existing chart is updated in place instead of
 //      destroyed and rebuilt, so it doesn't flash or replay its grow-in
 //      animation.
-//   4. While a multi-step action runs (import, delete, restore, reset,
-//      portfolio switch — anything under useBusy) → no drawing at all; the
-//      chart draws once when the action ends, with the final data.
+//   4. While several stores change one after another (an import, delete,
+//      restore, reset or portfolio switch under the loading cover, or a
+//      background refresh) → no drawing at all; the chart draws once when
+//      that ends, with the final data. See lib/drawHold.js.
 //
 // Usage (in a chart component's <script setup>):
 //   useChart(canvas, () => [props.a, props.b], makeConfig)
@@ -18,7 +19,7 @@
 // to draw, and reads only what the inputs getter returns (plus constants).
 import { watch, onMounted, onBeforeUnmount } from 'vue'
 import { Chart } from 'chart.js'
-import { busyRunning } from '@/composables/useBusy'
+import { drawsHeld } from '@/lib/drawHold'
 
 export function useChart(canvas, inputs, makeConfig) {
   let chart = null
@@ -29,7 +30,10 @@ export function useChart(canvas, inputs, makeConfig) {
 
   function draw() {
     frame = 0
-    if (!canvas.value || busyRunning.value) return
+    if (!canvas.value) return
+    // Held: wait for the end result. A chart's first draw still goes ahead,
+    // so a page opened mid-refresh shows what's already loaded, not a blank.
+    if (drawnKey !== null && drawsHeld()) return
     const key = keyOf()
     if (key === drawnKey) return
     drawnKey = key
@@ -54,7 +58,7 @@ export function useChart(canvas, inputs, makeConfig) {
   // Watching the key (a string) means the watcher only fires when the
   // values change, not whenever an equal array is swapped in.
   watch(keyOf, schedule)
-  watch(busyRunning, running => { if (!running) schedule() })
+  watch(drawsHeld, held => { if (!held) schedule() })
   onBeforeUnmount(() => {
     if (frame) cancelAnimationFrame(frame)
     chart?.destroy()

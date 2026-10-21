@@ -17,6 +17,8 @@
 // tab-focus/visibility listener (for whatever the CURRENTLY OPEN page
 // needs), and any view's own narrower reload.
 
+import { holdDraws } from '@/lib/drawHold'
+
 const REFRESH_MIN_INTERVAL = 15000
 const stores = new Map() // name -> { load: () => Promise, lastRefreshAt: number }
 
@@ -70,7 +72,9 @@ export function requestCloudRefresh(names, opts = {}) {
     entry.lastRefreshAt = now
     pending.push(entry.load())
   }
-  return Promise.all(pending)
+  if (!pending.length) return Promise.resolve()
+  // Several stores reloading side by side: charts draw once, after the last.
+  return holdDraws(() => Promise.all(pending))
 }
 
 // Lets a caller that just did its own real, targeted load of a store

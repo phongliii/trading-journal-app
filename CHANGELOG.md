@@ -31,7 +31,9 @@
 ### Fixed
 - Charts no longer redraw after every step of an import, delete, restore,
   reset or portfolio switch — they wait until the action has finished (or
-  failed) and draw once, with the final data.
+  failed) and draw once, with the final data. The same goes for the
+  background refresh when you come back to the tab or change page: changes
+  from another device now redraw the charts once, not once per part.
 - **Deleting trades for a date range could silently not work** — the
   "Cleared N trades" message showed but the trades came back (e.g. on the
   next page). Big ranges (presets like This Month / Last 12 Months) are now
