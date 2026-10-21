@@ -8,10 +8,10 @@
 //   3. A real change → the existing chart is updated in place instead of
 //      destroyed and rebuilt, so it doesn't flash or replay its grow-in
 //      animation.
-//   4. While several stores change one after another (an import, delete,
-//      restore, reset or portfolio switch under the loading cover, or a
-//      background refresh) → no drawing at all; the chart draws once when
-//      that ends, with the final data. See lib/drawHold.js.
+//   4. While fetches or saves are still running (sign-in, a portfolio
+//      switch, a background refresh, or an import/delete/restore/reset under
+//      the loading cover) → no drawing at all; the chart draws once when
+//      they've all finished, with the final data. See lib/drawHold.js.
 //
 // Usage (in a chart component's <script setup>):
 //   useChart(canvas, () => [props.a, props.b], makeConfig)
@@ -30,10 +30,9 @@ export function useChart(canvas, inputs, makeConfig) {
 
   function draw() {
     frame = 0
-    if (!canvas.value) return
-    // Held: wait for the end result. A chart's first draw still goes ahead,
-    // so a page opened mid-refresh shows what's already loaded, not a blank.
-    if (drawnKey !== null && drawsHeld()) return
+    // Held (fetches or saves still running): wait and draw once, with the
+    // end result — a chart opened mid-refresh included.
+    if (!canvas.value || drawsHeld()) return
     const key = keyOf()
     if (key === drawnKey) return
     drawnKey = key

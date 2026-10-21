@@ -81,12 +81,16 @@ describe('useChart', () => {
     expect(draws.updated).toBe(1)
   })
 
-  it('a chart opened during a hold draws straight away', async () => {
+  it('a chart opened during a fetch waits for it, then draws once', async () => {
     let endRefresh
+    const data = ref([1])
     const refresh = holdDraws(() => new Promise(r => { endRefresh = r }))
-    useChart(ref({}), () => [[1]], () => ({ type: 'line', data: {}, options: {} }))
-    expect(draws.created).toBe(1)
+    useChart(ref({}), () => [data.value], () => ({ type: 'line', data: {}, options: {} }))
+    expect(draws.created).toBe(0)
+    data.value = [1, 2]; await flush()
+    expect(draws.created).toBe(0)
     endRefresh(); await refresh; await flush()
+    expect(draws.created).toBe(1)
     expect(draws.updated).toBe(0)
   })
 })

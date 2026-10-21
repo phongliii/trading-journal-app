@@ -85,6 +85,7 @@ import { syncSettingsOnLoad } from '@/lib/cloudSettings'
 import { registerStore, requestCloudRefresh, markCloudRefreshed, setCloudSyncReady, PAGE_STORES } from '@/lib/cloudSync'
 import { useToast } from '@/composables/useToast'
 import { useBusy } from '@/composables/useBusy'
+import { holdDraws } from '@/lib/drawHold'
 import AppSidebar   from '@/components/layout/AppSidebar.vue'
 import AppTopbar    from '@/components/layout/AppTopbar.vue'
 import ToastStack   from '@/components/ui/ToastStack.vue'
@@ -242,13 +243,17 @@ async function loadCloudDataSequence() {
   // valid id by the time anything else runs.
   accountsStore.load()
   await accountsStore.whenLoaded()
-  await tradesStore.load()
-  // balance/cashEvents are cloud-only too (see stores/balance.js and
-  // stores/cashEvents.js) — both need to be loaded BEFORE
-  // checkWithdrawReminder() below, which reads balanceStore.currentBalance
-  // and balanceStore.fundTransactions synchronously; loading them after
-  // would leave that check running against the empty initial state.
-  await Promise.all([balanceStore.load(), cashEventsStore.load()])
+  // The charts need trades, balance and cash events — they wait for all
+  // three, then draw once (lib/drawHold.js).
+  await holdDraws(async () => {
+    await tradesStore.load()
+    // balance/cashEvents are cloud-only too (see stores/balance.js and
+    // stores/cashEvents.js) — both need to be loaded BEFORE
+    // checkWithdrawReminder() below, which reads balanceStore.currentBalance
+    // and balanceStore.fundTransactions synchronously; loading them after
+    // would leave that check running against the empty initial state.
+    await Promise.all([balanceStore.load(), cashEventsStore.load()])
+  })
   // Restore the connected chart-image folder handle app-wide on launch —
   // previously this only happened on the Journal/Settings pages, so opening
   // a Trade Drawer (e.g. from the Trades page) before visiting either of
@@ -333,7 +338,7 @@ watch(() => accountsStore.activeAccountId, async (id, prevId) => {
     // portfolio's data is in — a cover on top of that is one too many. Other
     // pages have no placeholder, so they keep the cover rather than showing
     // the old portfolio's data for a moment.
-    if (PAGES_WITH_SKELETON.has(route.name)) await loadAll()
+    if (PAGES_WITH_SKELETON.has(route.name)) await holdDraws(loadAll)
     else await busy.run('Switching portfolio…', loadAll)
   } finally {
     switchingPortfolio = false
