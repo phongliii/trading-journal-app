@@ -23,6 +23,17 @@
   "Chart image"; with text too it adds "(+ chart image)").
 
 ### Fixed
+- **Switching portfolio could keep showing the old one's data.** If a
+  background refresh of the old portfolio was still running, the switch
+  reused that load instead of loading the new portfolio. Loads are now only
+  shared between callers asking for the same portfolio.
+- An occasional **"Could not load your balance from the cloud"** message
+  (also cash events, journal, CSV backup), usually on returning to the tab
+  with the data already on screen. Loads now get the signed-in user from the
+  local session instead of an extra request to the sign-in server, retry
+  once after 1.5 s, and a failed background refresh of data already shown is
+  logged instead of shown. A failed first load or portfolio switch still
+  shows the message.
 - **Balance missed account fees** that aren't trading, e.g. a $35 "Dormant
   Fee" charged for an inactive month — the app's balance was higher than the
   broker's by their total. They're now read from Cash History and count in

@@ -10,7 +10,8 @@ import {
 import { pushSettingsPatch } from '@/lib/cloudSettings'
 import { journalAdapter } from '@/lib/journalAdapter'
 import { useToast } from '@/composables/useToast'
-import { reportCloudError } from '@/lib/cloudErrors'
+import { reportCloudError, reportLoadError, loadWithRetry } from '@/lib/cloudErrors'
+import { sharedLoad } from '@/lib/sharedLoad'
 
 // Exported (not just module-local) so lib/exportData.js can tell "still at
 // the factory default" apart from "the user actually customized this" when
@@ -162,8 +163,7 @@ export const useJournalStore = defineStore('journal', () => {
   // second redundant one. See whenLoaded() below.
   //
   // load() itself ALSO needs to reuse an in-flight call, not just let
-  // whenLoaded() observe one — without the `if (loadPromise) return
-  // loadPromise` guard below, two independent triggers calling load()
+  // whenLoaded() observe one — without sharing it (lib/sharedLoad.js), two independent triggers calling load()
   // close together (e.g. a route-navigation refresh and the entry-click
   // refresh in JournalView's refreshSelectedEntryFromCloud, each on its
   // own separate throttle) start two overlapping doLoad() runs. Both
@@ -176,12 +176,14 @@ export const useJournalStore = defineStore('journal', () => {
   // write landed) overwrote the later call's correct one. Coalescing
   // into one shared promise means only one doLoad() is ever running at a
   // time, so there's nothing left to race.
-  let loadPromise = null
-  async function load() {
-    if (loadPromise) return loadPromise
-    loadPromise = doLoad().finally(() => { loadPromise = null })
-    return loadPromise
+  // Shared only for the same portfolio — see lib/sharedLoad.js.
+  const sharedJournalLoad = sharedLoad(() => accountsStore.activeAccountId, () => doLoad())
+  let lastLoad = null // for whenLoaded()
+  function load() {
+    lastLoad = sharedJournalLoad()
+    return lastLoad
   }
+  let loadedFor = null // portfolio whose entries are loaded (see reportLoadError)
   async function doLoad() {
     loading.value = true
     const accountId = accountsStore.activeAccountId
@@ -192,7 +194,7 @@ export const useJournalStore = defineStore('journal', () => {
       // portfolio's readList has no bearing on this one at all.
       let localRead = []
       try { localRead = JSON.parse(localStorage.getItem(readKeyFor(accountId)) || '[]') } catch { /* ignore */ }
-      const { data: cloudData, readList: cloudRead } = await journalAdapter.load(accountId)
+      const { data: cloudData, readList: cloudRead } = await loadWithRetry(() => journalAdapter.load(accountId))
       data.value = cloudData
 
       // Re-read localStorage now, right before merging, instead of only
@@ -259,8 +261,9 @@ export const useJournalStore = defineStore('journal', () => {
       }
 
       loaded.value = true
+      loadedFor = accountId
     } catch (e) {
-      reportCloudError(toast, e, 'Could not load journal entries from the cloud:',
+      reportLoadError(toast, e, loadedFor === accountId, 'Could not load journal entries from the cloud:',
         'Could not load your journal from the cloud — try reloading the page.')
     } finally {
       loading.value = false
@@ -278,7 +281,7 @@ export const useJournalStore = defineStore('journal', () => {
   // in) — either way there's nothing further to wait for.
   async function whenLoaded() {
     if (loaded.value) return
-    if (loadPromise) await loadPromise
+    if (lastLoad) await lastLoad
   }
 
   function setChecklistQuestions(questions) {

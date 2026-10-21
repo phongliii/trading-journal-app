@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { adapter } from '@/lib/storage'
 import { computeStats } from '@/lib/stats'
 import { useAccountsStore } from './accounts'
+import { sharedLoad } from '@/lib/sharedLoad'
 
 // Exact content comparison (not just length) — used by doLoad() to decide
 // whether a reload actually found anything different before replacing the
@@ -37,12 +38,8 @@ export const useTradesStore = defineStore('trades', () => {
   // network requests and two redundant re-renders for one page visit —
   // this is the "dashboard fetches data too many times" symptom, since
   // Dashboard is the page that reads trades/balance/cashEvents together.
-  let loadPromise = null
-  async function load() {
-    if (loadPromise) return loadPromise
-    loadPromise = doLoad().finally(() => { loadPromise = null })
-    return loadPromise
-  }
+  // Shared only for the same portfolio — see lib/sharedLoad.js.
+  const load = sharedLoad(() => accountsStore.activeAccountId, () => doLoad())
   async function doLoad() {
     loading.value = true
     error.value   = null

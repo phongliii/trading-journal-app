@@ -4,8 +4,9 @@ import { useTradesStore } from './trades'
 import { useAccountsStore } from './accounts'
 import { balanceAdapter } from '@/lib/balanceAdapter'
 import { useToast } from '@/composables/useToast'
-import { reportCloudError } from '@/lib/cloudErrors'
+import { reportCloudError, reportLoadError, loadWithRetry } from '@/lib/cloudErrors'
 import { computeCorrectStarting, computeCurrentBalance, mergeFundTransactions, withoutCancelledWithdrawals } from '@/lib/balance'
+import { sharedLoad } from '@/lib/sharedLoad'
 
 // Cloud-only now (see lib/balanceAdapter.js) — no localStorage copy. `data`
 // starts empty and is populated by load() (called from App.vue once
@@ -35,16 +36,14 @@ export const useBalanceStore = defineStore('balance', () => {
   // network requests and two redundant re-renders for one page visit —
   // this is the "dashboard fetches data too many times" symptom, since
   // Dashboard is the page that reads trades/balance/cashEvents together.
-  let loadPromise = null
-  async function load() {
-    if (loadPromise) return loadPromise
-    loadPromise = doLoad().finally(() => { loadPromise = null })
-    return loadPromise
-  }
+  // Shared only for the same portfolio — see lib/sharedLoad.js.
+  const load = sharedLoad(() => accountsStore.activeAccountId, () => doLoad())
+  let loadedFor = null // portfolio whose data is in `data` (see reportLoadError)
   async function doLoad() {
     loading.value = true
+    const accountId = accountsStore.activeAccountId
     try {
-      const fresh = await balanceAdapter.load(accountsStore.activeAccountId)
+      const fresh = await loadWithRetry(() => balanceAdapter.load(accountId))
       // Same reasoning as trades.js's doLoad(): skip replacing `data`
       // when a reload comes back identical to what's already here.
       // fundTransactions feeds the equity curve directly — a new (but
@@ -55,8 +54,9 @@ export const useBalanceStore = defineStore('balance', () => {
       // happened" flag Dashboard's skeleton gate depends on.
       if (JSON.stringify(fresh) !== JSON.stringify(data.value)) data.value = fresh
       loaded.value = true
+      loadedFor = accountId
     } catch (e) {
-      reportCloudError(toast, e, 'Could not load balance from the cloud:',
+      reportLoadError(toast, e, loadedFor === accountId, 'Could not load balance from the cloud:',
         'Could not load your balance from the cloud — try reloading the page.')
     } finally {
       loading.value = false
