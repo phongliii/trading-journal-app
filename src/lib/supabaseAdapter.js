@@ -77,6 +77,9 @@ async function selectAllRows(sb, table, { cols = '*', orderCol, ascending, build
   return all
 }
 
+// Trade ids per delete request (see deleteTrades).
+const DELETE_CHUNK = 100
+
 export const supabaseAdapter = {
   async loadTrades(accountId) {
     const sb = getSupabase()
@@ -242,12 +245,21 @@ export const supabaseAdapter = {
 
   // Batch version of deleteTrade — see localAdapter's deleteTrades for why
   // this exists (avoids one round trip per trade when clearing many at once).
+  //
+  // Sent in chunks: every id goes into the request URL, so one request for
+  // a big range ("Last 12 Months" can be thousands of trades) gets too long
+  // to be accepted. Each chunk asks for the deleted rows back, so the result
+  // reflects what the cloud actually removed — only those leave the list,
+  // and the caller can tell when fewer were deleted than asked.
   async deleteTrades(ids, existing) {
     const sb = getSupabase()
-    const { error } = await sb.from('trades').delete().in('id', ids)
-    if (error) throw error
-    const idSet = new Set(ids)
-    return existing.filter(t => !idSet.has(t.id))
+    const deleted = new Set()
+    for (let i = 0; i < ids.length; i += DELETE_CHUNK) {
+      const { data, error } = await sb.from('trades').delete().in('id', ids.slice(i, i + DELETE_CHUNK)).select('id')
+      if (error) throw error
+      for (const row of data || []) deleted.add(row.id)
+    }
+    return { remaining: existing.filter(t => !deleted.has(t.id)), deleted: deleted.size }
   },
 
   async updateTrade(id, patch, existing) {
