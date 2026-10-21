@@ -23,6 +23,11 @@
   "Chart image"; with text too it adds "(+ chart image)").
 
 ### Fixed
+- **Dashboard charts redrew several times after switching portfolio**, once
+  as each of trades, balance and cash history arrived (and briefly mixed the
+  new portfolio's trades with the old one's balance). The Dashboard now shows
+  its loading placeholder until all three have loaded for the new portfolio,
+  then draws each chart once.
 - **Switching portfolio could keep showing the old one's data.** If a
   background refresh of the old portfolio was still running, the switch
   reused that load instead of loading the new portfolio. Loads are now only

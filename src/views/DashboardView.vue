@@ -188,6 +188,7 @@
 <script setup>
 import { computed, ref, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useTradesStore } from '@/stores/trades'
+import { useAccountsStore } from '@/stores/accounts'
 import { useBalanceStore } from '@/stores/balance'
 import { useCashEventsStore } from '@/stores/cashEvents'
 import { useTimezoneStore } from '@/stores/timezone'
@@ -210,6 +211,7 @@ import Dropdown       from '@/components/ui/Dropdown.vue'
 import Skeleton       from '@/components/ui/Skeleton.vue'
 
 const tradesStore     = useTradesStore()
+const accountsStore = useAccountsStore()
 const balanceStore    = useBalanceStore()
 const cashEventsStore = useCashEventsStore()
 const tzStore         = useTimezoneStore()
@@ -251,9 +253,17 @@ const rangePnlCurve = computed(() => {
 // Account Balance card popping in). Each store's `loaded` flag stays true
 // after its first load, so later background refreshes never bring the
 // skeleton back.
-const initialLoading = computed(() =>
-  !(tradesStore.loaded && balanceStore.loaded && cashEventsStore.loaded)
-)
+//
+// Same after switching portfolio: until all three have loaded for the new
+// one, the charts would redraw as each arrived (and briefly mix the new
+// portfolio's trades with the old one's balance) — so the skeleton shows
+// until they've all settled for the active portfolio, then everything
+// draws once. A failed load counts as settled, so it can't hang.
+const initialLoading = computed(() => {
+  const active = accountsStore.activeAccountId
+  return !(tradesStore.loaded && balanceStore.loaded && cashEventsStore.loaded) ||
+    [tradesStore, balanceStore, cashEventsStore].some(s => s.settledFor !== active)
+})
 
 // Full balance history (starting balance + every trade + deposit/withdrawal).
 const fullBalanceCurve = computed(() => {

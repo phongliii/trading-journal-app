@@ -39,6 +39,7 @@ export const useBalanceStore = defineStore('balance', () => {
   // Shared only for the same portfolio — see lib/sharedLoad.js.
   const load = sharedLoad(() => accountsStore.activeAccountId, () => doLoad())
   let loadedFor = null // portfolio whose data is in `data` (see reportLoadError)
+  const settledFor = ref(null) // portfolio whose load last finished, ok or not (Dashboard waits on it)
   async function doLoad() {
     loading.value = true
     const accountId = accountsStore.activeAccountId
@@ -59,6 +60,7 @@ export const useBalanceStore = defineStore('balance', () => {
       reportLoadError(toast, e, loadedFor === accountId, 'Could not load balance from the cloud:',
         'Could not load your balance from the cloud — try reloading the page.')
     } finally {
+      settledFor.value = accountId
       loading.value = false
     }
   }
@@ -131,7 +133,7 @@ export const useBalanceStore = defineStore('balance', () => {
   const earliestBalanceDate = computed(() => data.value.earliestBalanceDate)
 
   return {
-    loading, loaded, load,
+    loading, loaded, settledFor, load,
     startingBalance, earliestBalanceDate, correctStarting, fundTransactions, allFundTransactions, totalFundFlow, hasBalance, currentBalance,
     setStartingBalance, setFundTransactions, mergeTransactions, clearBalance, clearFundTransactions,
   }
