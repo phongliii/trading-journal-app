@@ -11,7 +11,13 @@
       </TooltipWrap>
     </div>
     <div v-if="noTradeDay" class="inline-flex items-center bg-surface-3 text-ink-muted text-2xs font-medium rounded-full px-2.5 py-0.5">No-trade day</div>
-    <div v-if="!noTradeDay" class="text-xs text-ink-muted leading-loose pr-6">
+    <!-- No questions set up: say so (and where to add them) rather than
+         leave an empty box. -->
+    <div v-else-if="!questions.length" class="text-xs text-ink-faint pr-6">
+      No check-in questions yet.
+      <router-link :to="SETTINGS_LINK" class="text-brand hover:underline">Add questions</router-link>
+    </div>
+    <div v-else class="text-xs text-ink-muted leading-loose pr-6">
       <div v-for="(q, i) in questions" :key="q.id">
         {{ i + 1 }}. {{ q.text }}
         <span v-if="answers[q.id] === 'yes'" class="font-semibold" :class="q.yesIsGood ? 'text-up' : 'text-down'">Yes.</span>
@@ -24,6 +30,7 @@
 
 <script setup>
 import TooltipWrap from '@/components/ui/TooltipWrap.vue'
+import { SETTINGS_LINK } from '@/lib/checkinQuestions'
 defineProps({
   questions: { type: Array, required: true },
   answers:   { type: Object, default: () => ({}) },
