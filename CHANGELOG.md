@@ -29,6 +29,11 @@
   "Chart image"; with text too it adds "(+ chart image)").
 
 ### Fixed
+- With no daily check-in questions set up, a journal entry's check-in card
+  was an empty box and the check-in only showed the No-trade toggle. Both now
+  say there are no questions yet, with a link to add them in Settings (which
+  scrolls to the questions), and Settings says the check-in won't pop up
+  until one is added.
 - Toasts showed **under** the loading cover and dialogs; they now always sit
   on top.
 - Charts no longer redraw after every step of an import, delete, restore,

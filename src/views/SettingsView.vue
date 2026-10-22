@@ -215,7 +215,7 @@
     </div>
 
     <!-- Daily Check-in Questions -->
-    <div class="bg-surface-2 border border-border rounded-xl overflow-hidden">
+    <div :id="CHECKIN_SECTION_ID" class="bg-surface-2 border border-border rounded-xl overflow-hidden">
       <div class="px-5 py-4 border-b border-border">
         <h2 class="text-sm font-semibold text-ink">Daily Check-in Questions</h2>
         <p class="text-xs text-ink-muted mt-0.5">Shown the first time you open each daily journal entry. Drag to reorder.</p>
@@ -255,6 +255,9 @@
             </div>
           </template>
         </draggable>
+        <p v-if="!checklistDraft.length" class="text-xs text-ink-faint mb-3">
+          No questions — the daily check-in won't pop up until you add one.
+        </p>
         <button @click="showAddQuestion = true" class="text-xs text-brand hover:underline">+ Add question</button>
       </div>
     </div>
@@ -460,7 +463,8 @@ const { confirm: $confirm } = useConfirm()
 import { useBusy } from '@/composables/useBusy'
 const busy = useBusy()
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
+import { CHECKIN_SECTION_ID } from '@/lib/checkinQuestions'
 import TooltipWrap from '@/components/ui/TooltipWrap.vue'
 import Dropdown from '@/components/ui/Dropdown.vue'
 import { useTradesStore }   from '@/stores/trades'
@@ -494,6 +498,7 @@ import sql from '@/lib/supabase.sql?raw'
 const appVersion = pkg.version
 
 const router        = useRouter()
+const route         = useRoute()
 const authStore     = useAuthStore()
 const tradesStore   = useTradesStore()
 const balanceStore  = useBalanceStore()
@@ -799,6 +804,11 @@ function copySql() {
 }
 
 onMounted(async () => {
+  // Linked from a journal entry's empty check-in: jump to the questions.
+  if (route.hash === '#' + CHECKIN_SECTION_ID) {
+    // Next frame: after the router's own scroll-to-top for the new page.
+    requestAnimationFrame(() => document.getElementById(CHECKIN_SECTION_ID)?.scrollIntoView({ block: 'start' }))
+  }
   await imageStorageStore.restore()
   await imageStorageStore.refreshStats()
 })

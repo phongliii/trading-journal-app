@@ -20,6 +20,10 @@
           </span>
         </button>
 
+        <p v-if="!noTradeDay && !questions.length" class="text-xs text-ink-faint mb-4">
+          You don't have any check-in questions yet.
+          <router-link :to="SETTINGS_LINK" class="text-brand hover:underline" @click="skip">Add questions in Settings</router-link>
+        </p>
         <!-- Questions are about trading, so they're hidden on a no-trade day.
              Any answers already given are kept (not cleared) in case the
              toggle is switched back off. -->
@@ -48,6 +52,7 @@
 
 <script setup>
 import { ref } from 'vue'
+import { SETTINGS_LINK } from '@/lib/checkinQuestions'
 
 const props = defineProps({
   questions: { type: Array, required: true },
