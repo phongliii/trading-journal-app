@@ -11,6 +11,13 @@
   it's merged.
 
 ### Changed
+- **Always the latest data when you change page.** Opening a page (or
+  coming back to the tab) now always checks the cloud for changes from any
+  device — before, a page opened within 15 seconds of the last check could
+  show older data. The check is one tiny request per kind of data (how many
+  rows, and when the newest changed); the full data is only downloaded when
+  something actually changed. Reloading the page (F5) already loads
+  everything fresh.
 - **Reset is now a menu, not one big button.** Settings → Reset opens a
   window where you pick the portfolio (any one from a dropdown — the active one first — or all of them) and
   what to delete — trades; balance, deposits & account fees; cash history;

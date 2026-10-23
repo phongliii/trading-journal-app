@@ -82,7 +82,8 @@ import { useRawCsvArchiveStore } from '@/stores/rawCsvArchive'
 import { useAccountsStore } from '@/stores/accounts'
 import { useAuthStore } from '@/stores/auth'
 import { syncSettingsOnLoad } from '@/lib/cloudSettings'
-import { registerStore, requestCloudRefresh, markCloudRefreshed, setCloudSyncReady, PAGE_STORES } from '@/lib/cloudSync'
+import { registerStore, requestCloudRefresh, markCloudRefreshed, primeCloudStamps, setCloudSyncReady, PAGE_STORES } from '@/lib/cloudSync'
+import { tableStamp } from '@/lib/cloudStamp'
 import { useToast } from '@/composables/useToast'
 import { useBusy } from '@/composables/useBusy'
 import { holdDraws } from '@/lib/drawHold'
@@ -243,6 +244,9 @@ async function loadCloudDataSequence() {
   // valid id by the time anything else runs.
   accountsStore.load()
   await accountsStore.whenLoaded()
+  // What's in the cloud as this load starts — so the first page change
+  // after it doesn't download everything again (lib/cloudSync.js).
+  primeCloudStamps(ALL_CLOUD_STORES)
   // The charts need trades, balance and cash events — they wait for all
   // three, then draw once (lib/drawHold.js).
   await holdDraws(async () => {
@@ -326,6 +330,7 @@ watch(() => accountsStore.activeAccountId, async (id, prevId) => {
   // immediately-following page navigation to redundantly reload the same
   // data this switch is already fetching.
   markCloudRefreshed(ALL_CLOUD_STORES)
+  primeCloudStamps(ALL_CLOUD_STORES)
   switchingPortfolio = true
   // Charts wait for the data they draw (trades, balance, cash events) — not
   // for the journal or the CSV backup, which load alongside.
@@ -373,11 +378,17 @@ function onWindowFocus() {
 // JournalView (on opening an entry, for journal alone) then ask
 // cloudSync.js for a refresh by name instead of each importing every
 // store and rebuilding this wiring themselves.
-registerStore('trades', () => tradesStore.load())
-registerStore('balance', () => balanceStore.load())
-registerStore('cashEvents', () => cashEventsStore.load())
-registerStore('journal', () => journalStore.load())
-registerStore('rawCsvArchive', () => rawCsvArchiveStore.load())
+// Each with its cloud table's change fingerprint (lib/cloudStamp.js): a page
+// change or tab return asks for that first and only reloads what changed.
+const stampOf = table => () => {
+  if (!accountsStore.activeAccountId) throw new Error('No active portfolio yet')
+  return tableStamp(table, accountsStore.activeAccountId)
+}
+registerStore('trades', () => tradesStore.load(), stampOf('trades'))
+registerStore('balance', () => balanceStore.load(), stampOf('balance'))
+registerStore('cashEvents', () => cashEventsStore.load(), stampOf('cash_events'))
+registerStore('journal', () => journalStore.load(), stampOf('journal_entries'))
+registerStore('rawCsvArchive', () => rawCsvArchiveStore.load(), stampOf('raw_csv_archive'))
 
 onMounted(() => {
   idle(() => prefetchLoginView())

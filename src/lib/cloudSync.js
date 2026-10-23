@@ -19,8 +19,11 @@
 
 import { holdRedraws } from '@/lib/drawHold'
 
-const REFRESH_MIN_INTERVAL = 15000
-const stores = new Map() // name -> { load: () => Promise, lastRefreshAt: number }
+// Just enough to fold the focus + visibilitychange pair a tab switch fires
+// into one check. Each check is cheap (see stamp below), so there's no
+// longer a long window in which a page could show stale data.
+const REFRESH_MIN_INTERVAL = 2000
+const stores = new Map() // name -> { load, stamp, lastStamp, lastRefreshAt }
 
 // Set once the app's initial sign-in load has actually finished (see
 // App.vue) — before that, a page-level refresh has nothing to usefully do
@@ -28,8 +31,35 @@ const stores = new Map() // name -> { load: () => Promise, lastRefreshAt: number
 let ready = false
 export function setCloudSyncReady(v) { ready = v }
 
-export function registerStore(name, loadFn) {
-  stores.set(name, { load: loadFn, lastRefreshAt: 0 })
+// stampFn (optional): a cheap fingerprint of the store's cloud data
+// (lib/cloudStamp.js). With one, a refresh first asks for it and only runs
+// the full load when it changed since the last one seen.
+export function registerStore(name, loadFn, stampFn = null) {
+  stores.set(name, { load: loadFn, stamp: stampFn, lastStamp: null, lastRefreshAt: 0 })
+}
+
+// Fetch a fingerprint, or null if it can't be had (then a full load runs).
+async function safeStamp(entry) {
+  if (!entry.stamp) return null
+  try { return await entry.stamp() } catch { return null }
+}
+
+async function refreshOne(entry, force) {
+  const stamp = await safeStamp(entry)
+  if (!force && stamp !== null && stamp === entry.lastStamp) return // unchanged
+  await entry.load()
+  entry.lastStamp = stamp
+}
+
+// Record the current fingerprints as "already loaded" — called as a full
+// load starts (sign-in, portfolio switch), so the next page change doesn't
+// download the same data again. Taken before the load finishes: a change
+// landing in between is then picked up by the next check, never missed.
+export function primeCloudStamps(names) {
+  return Promise.all(names.map(async name => {
+    const entry = stores.get(name)
+    if (entry) entry.lastStamp = await safeStamp(entry)
+  }))
 }
 
 function isEditingSomething() {
@@ -39,7 +69,8 @@ function isEditingSomething() {
 }
 
 // Refreshes whichever of the named stores are actually due (past
-// REFRESH_MIN_INTERVAL since they last loaded, from ANY caller) and
+// REFRESH_MIN_INTERVAL since they last loaded, from ANY caller) and whose
+// cloud data changed since (checked with a cheap fingerprint first), and
 // silently skips the rest — scoped per store rather than one clock for the
 // whole app, so a page only ever refetches what it actually needs. Skips
 // everything while the user is mid-edit (an open note, a trade field):
@@ -70,7 +101,7 @@ export function requestCloudRefresh(names, opts = {}) {
     if (!entry) continue
     if (!opts.force && now - entry.lastRefreshAt < REFRESH_MIN_INTERVAL) continue
     entry.lastRefreshAt = now
-    pending.push(entry.load())
+    pending.push(refreshOne(entry, !!opts.force))
   }
   if (!pending.length) return Promise.resolve()
   // Several stores reloading side by side: charts on screen redraw once,
