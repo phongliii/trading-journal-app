@@ -12,7 +12,7 @@
 
 ### Changed
 - **Reset is now a menu, not one big button.** Settings → Reset… opens a
-  window where you pick the portfolio (the open one, or all of them) and
+  window where you pick the portfolio (any one from a dropdown, or all of them) and
   what to delete — trades; balance, deposits & account fees; cash history;
   journal; backed-up CSV files — and, separately, whether to reset the
   settings every portfolio shares (tags, strategies, check-in questions,
