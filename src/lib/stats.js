@@ -1,8 +1,13 @@
 import { format, parseISO, getDay, getMonth, startOfWeek, endOfWeek, eachDayOfInterval, startOfMonth, endOfMonth, isSameMonth, isToday, startOfYear, endOfYear, subYears, subMonths, startOfQuarter, endOfQuarter, subQuarters } from 'date-fns'
 import { tradeDay, tradeDayDate } from '@/lib/tradeDay'
+import { chargesTotal } from '@/lib/accountCharges'
 
-export function computeStats(trades) {
-  if (!trades || trades.length === 0) return emptyStats()
+// `charges`: account fees/credits (lib/accountCharges.js) in the same period —
+// counted in totalPnl, the equity curve and daily bars, never in the
+// per-trade stats.
+export function computeStats(trades, charges = []) {
+  trades = trades || []
+  if (trades.length === 0 && !charges.length) return emptyStats()
 
   // Win/Loss/Breakeven classification uses GROSS P&L (before fees) — matches NinjaTrader convention
   const wins      = trades.filter(t => (t.gross_pnl ?? t.pnl) > 0)
@@ -10,7 +15,7 @@ export function computeStats(trades) {
   const breakeven = trades.filter(t => (t.gross_pnl ?? t.pnl) === 0)
   const n = trades.length
 
-  const totalPnl   = trades.reduce((s, t) => s + t.pnl, 0)
+  const totalPnl   = trades.reduce((s, t) => s + t.pnl, 0) + chargesTotal(charges)
   // Gross win/loss dollar totals still based on NET P&L for financial accuracy (fees are real costs)
   const netWins    = trades.filter(t => t.pnl > 0)
   const netLosses  = trades.filter(t => t.pnl < 0)
@@ -32,18 +37,23 @@ export function computeStats(trades) {
     else { curLosses++; curWins = 0; maxConsecLosses = Math.max(maxConsecLosses, curLosses) }
   }
 
+  // Trades and account charges in the order they happened (a charge has
+  // only a date), each point dated by its trading day.
+  const events = [
+    ...sorted.map(t => ({ at: t.sold_at || '', date: tradeDay(t), delta: t.pnl })),
+    ...charges.map(f => ({ at: f.date, date: f.date, delta: f.amount })),
+  ].sort((a, b) => a.at.localeCompare(b.at))
   let cumulative = 0
-  const equityCurve = sorted.map(t => {
-    cumulative += t.pnl
-    return { date: tradeDay(t), value: cumulative }
+  const equityCurve = events.map(e => {
+    cumulative += e.delta
+    return { date: e.date, value: cumulative }
   })
 
   // Daily P&L bars (for bar chart above equity curve)
   const dailyMap = {}
-  for (const t of sorted) {
-    const key = tradeDay(t)
-    if (!key) continue
-    dailyMap[key] = (dailyMap[key] || 0) + t.pnl
+  for (const e of events) {
+    if (!e.date) continue
+    dailyMap[e.date] = (dailyMap[e.date] || 0) + e.delta
   }
   const dailyBars = Object.entries(dailyMap)
     .sort(([a], [b]) => a.localeCompare(b))
@@ -69,10 +79,14 @@ export function computeStats(trades) {
 // Lightweight aggregate for a set of trades — just pnl/trades/winRate, no
 // equity curve or drawdown. Used by the Calendar page's day/month/year cells,
 // which previously each reimplemented this same reduce+filter by hand.
-export function aggregateTrades(trades) {
+// `charges` (account fees/credits in the same period) count toward pnl only.
+export function aggregateTrades(trades, charges = []) {
   const wins = trades.filter(t => (t.gross_pnl ?? t.pnl) > 0).length
+  const chargeTotal = chargesTotal(charges)
   return {
-    pnl: trades.reduce((s, t) => s + t.pnl, 0),
+    pnl: trades.reduce((s, t) => s + t.pnl, 0) + chargeTotal,
+    charges: chargeTotal,
+    chargeLabels: [...new Set(charges.map(f => f.label).filter(Boolean))],
     trades: trades.length,
     wins,
     winRate: trades.length ? (wins / trades.length) * 100 : 0,

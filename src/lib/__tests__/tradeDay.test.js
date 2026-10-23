@@ -55,4 +55,18 @@ describe('day grouping follows the trading day', () => {
       { date: '2026-10-23', value: 350 },
     ])
   })
+
+  it('counts account fees in total P&L, daily bars and the equity curve — not in trade stats', () => {
+    const fee = { date: '2026-10-23', amount: -50, type: 'fee', label: 'Liquidation Fee' }
+    const s = computeStats(trades, [fee])
+    expect(s.totalPnl).toBe(-750)
+    expect(s.total).toBe(2)
+    expect(s.dailyBars).toEqual([
+      { date: '2026-10-22', pnl: -100 },
+      { date: '2026-10-23', pnl: -650 },
+    ])
+    expect(s.equityCurve.map(p => [p.date, p.value])).toEqual([
+      ['2026-10-22', -100], ['2026-10-23', -700], ['2026-10-23', -750],
+    ])
+  })
 })

@@ -7,6 +7,7 @@ import { useToast } from '@/composables/useToast'
 import { reportCloudError, reportLoadError, loadWithRetry } from '@/lib/cloudErrors'
 import { computeCorrectStarting, computeCurrentBalance, mergeFundTransactions, withoutCancelledWithdrawals } from '@/lib/balance'
 import { sharedLoad } from '@/lib/sharedLoad'
+import { accountCharges as accountChargesOf } from '@/lib/accountCharges'
 
 // Cloud-only now (see lib/balanceAdapter.js) — no localStorage copy. `data`
 // starts empty and is populated by load() (called from App.vue once
@@ -119,6 +120,9 @@ export const useBalanceStore = defineStore('balance', () => {
   const fundTransactions  = computed(() => withoutCancelledWithdrawals(data.value.fundTransactions || []))
   // Every saved one, unapproved withdrawals included (Settings lists them with a status).
   const allFundTransactions = computed(() => data.value.fundTransactions || [])
+  // Approved account fees/credits (Dormant Fee, Liquidation Fee, …) — they
+  // count in every P&L total; see lib/accountCharges.js.
+  const accountCharges = computed(() => accountChargesOf(fundTransactions.value))
   const totalFundFlow     = computed(() => fundTransactions.value.reduce((s, t) => s + t.amount, 0))
   const hasBalance    = computed(() => data.value.rawStarting !== null && data.value.rawStarting !== undefined)
 
@@ -134,7 +138,7 @@ export const useBalanceStore = defineStore('balance', () => {
 
   return {
     loading, loaded, settledFor, load,
-    startingBalance, earliestBalanceDate, correctStarting, fundTransactions, allFundTransactions, totalFundFlow, hasBalance, currentBalance,
+    startingBalance, earliestBalanceDate, correctStarting, fundTransactions, allFundTransactions, accountCharges, totalFundFlow, hasBalance, currentBalance,
     setStartingBalance, setFundTransactions, mergeTransactions, clearBalance, clearFundTransactions,
   }
 })

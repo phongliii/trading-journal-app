@@ -26,7 +26,7 @@
 
     <!-- Weekly calendar -->
     <section>
-      <CalendarStrip :trades="tradesStore.trades" />
+      <CalendarStrip :trades="tradesStore.trades" :charges="balanceStore.accountCharges" />
     </section>
 
     <!-- Stat cards -->
@@ -188,6 +188,7 @@
 <script setup>
 import { computed, ref, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { tradeDay, tradeDayDate } from '@/lib/tradeDay'
+import { chargesBetween } from '@/lib/accountCharges'
 import { useTradesStore } from '@/stores/trades'
 import { useAccountsStore } from '@/stores/accounts'
 import { useBalanceStore } from '@/stores/balance'
@@ -216,7 +217,8 @@ const accountsStore = useAccountsStore()
 const balanceStore    = useBalanceStore()
 const cashEventsStore = useCashEventsStore()
 const tzStore         = useTimezoneStore()
-const stats           = computed(() => tradesStore.stats)
+// Account fees count in Net P&L (lib/accountCharges.js), not in trade stats.
+const stats           = computed(() => computeStats(tradesStore.trades, balanceStore.accountCharges))
 const pnlMode         = ref('gross')
 const equityMode      = ref('equity')
 
@@ -229,6 +231,7 @@ const realizedBars = computed(() => {
     if (!k) continue
     byDay[k] = (byDay[k] || 0) + t.pnl
   }
+  for (const f of balanceStore.accountCharges) byDay[f.date] = (byDay[f.date] || 0) + f.amount
   return Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b)).map(([date, pnl]) => ({ date, pnl }))
 })
 const realized = computed(() => buildRealizedBuckets(realizedBars.value, realizedRange.value, tzStore.localDateObj()))
@@ -244,7 +247,7 @@ const equityRangeFrom = computed(() => {
 const rangePnlCurve = computed(() => {
   const from = equityRangeFrom.value
   const inRange = from ? tradesStore.trades.filter(t => t.sold_at && tradeDay(t) >= from) : tradesStore.trades
-  return computeStats(inRange).equityCurve
+  return computeStats(inRange, chargesBetween(balanceStore.accountCharges, from, null)).equityCurve
 })
 
 // Drives the skeleton below — true until trades, balance AND cashEvents

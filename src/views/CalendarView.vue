@@ -40,8 +40,8 @@
             // Not faded while its note overlay is showing.
             !cell.inMonth && !isNoteOpen(cell.date) ? 'opacity-20' : '',
             cell.inMonth && cell.isFuture ? 'opacity-35' : '',
-            cell.inMonth && !cell.isFuture && cell.trades > 0 && cell.pnl > 0 ? 'bg-up/5' : '',
-            cell.inMonth && !cell.isFuture && cell.trades > 0 && cell.pnl < 0 ? 'bg-down/5' : '',
+            cell.inMonth && !cell.isFuture && hasActivity(cell) && cell.pnl > 0 ? 'bg-up/5' : '',
+            cell.inMonth && !cell.isFuture && hasActivity(cell) && cell.pnl < 0 ? 'bg-down/5' : '',
             !cell.isFuture ? 'hover:bg-surface-3/40 cursor-pointer' : '',
           ]"
           @click="!cell.isFuture && onDayClick(cell.date, $event)">
@@ -62,14 +62,19 @@
           </div>
 
           <!-- Trade stats — same as weekly strip -->
-          <div v-if="cell.trades > 0 && cell.inMonth" class="space-y-1">
+          <div v-if="hasActivity(cell) && cell.inMonth" class="space-y-1">
             <div class="font-mono text-sm font-bold leading-none"
               :class="cell.pnl > 0 ? 'text-up' : 'text-down'">
               <CompactValue :value="cell.pnl" />
             </div>
-            <div class="text-2xs text-ink-muted">{{ cell.trades }} trade{{ cell.trades !== 1 ? 's' : '' }}</div>
-            <div class="text-2xs" :class="cell.winRate >= 50 ? 'text-up/70' : 'text-down/70'">
-              {{ fmtPct(cell.winRate) }} wr
+            <template v-if="cell.trades > 0">
+              <div class="text-2xs text-ink-muted">{{ cell.trades }} trade{{ cell.trades !== 1 ? 's' : '' }}</div>
+              <div class="text-2xs" :class="cell.winRate >= 50 ? 'text-up/70' : 'text-down/70'">
+                {{ fmtPct(cell.winRate) }} wr
+              </div>
+            </template>
+            <div v-if="cell.charges" class="text-2xs text-ink-faint truncate" :title="cell.chargeLabels.join(', ')">
+              {{ cell.chargeLabels.join(', ') || 'Account fee' }} <CompactValue :value="cell.charges" />
             </div>
           </div>
           <!-- Marked "No-trade day" in the Journal check-in -->
@@ -81,7 +86,7 @@
             <div class="text-2xs text-ink-faint/40">0 trades</div>
           </div>
 
-          <div v-if="cell.trades > 0 && cell.inMonth"
+          <div v-if="hasActivity(cell) && cell.inMonth"
             class="absolute bottom-0 left-0 right-0 h-0.5"
             :class="cell.pnl >= 0 ? 'bg-up' : 'bg-down'" />
 
@@ -189,7 +194,7 @@
               width="10"
               :height="Math.max(2, barHeight(y, m.pnl))"
               rx="2"
-              :fill="m.trades === 0 ? 'transparent' : m.pnl >= 0 ? '#4ade80' : '#f87171'"
+              :fill="!hasActivity(m) ? 'transparent' : m.pnl >= 0 ? '#4ade80' : '#f87171'"
               class="transition-opacity hover:opacity-70"
               @mouseenter.stop="showMonthTip($event, y, m)"
               @mouseleave.stop="hideMonthTip" />
@@ -219,6 +224,7 @@
 import { ref, computed } from 'vue'
 import { tradeDayDate } from '@/lib/tradeDay'
 import { useTradesStore } from '@/stores/trades'
+import { useBalanceStore } from '@/stores/balance'
 import { useJournalStore } from '@/stores/journal'
 import { useTimezoneStore } from '@/stores/timezone'
 import { fmt, fmtPct, computeStats, aggregateTrades } from '@/lib/stats'
@@ -237,12 +243,20 @@ import {
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
 const tradesStore  = useTradesStore()
+const balanceStore = useBalanceStore()
 const journalStore = useJournalStore()
 // Day clicks: overlay with Open note / Create note + Close.
 const { noteTarget, isNoteOpen, isWeekNoteOpen, onDayClick, onWeekClick, confirmNote, closeNote } = useCalendarNotes()
 const tzStore      = useTimezoneStore()
 
 const isNoTradeDay   = (date) => journalStore.getNoTradeDay(format(date, 'yyyy-MM-dd'))
+
+// Account fees/credits count in every P&L total here (lib/accountCharges.js);
+// `prefix` is a date prefix: 'yyyy', 'yyyy-MM' or 'yyyy-MM-dd'.
+const chargesIn = (prefix) => balanceStore.accountCharges.filter(f => f.date.startsWith(prefix))
+// A day with trades or an account fee/credit.
+const hasActivity = (cell) => cell.trades > 0 || cell.charges !== 0
+const monthPrefix = (y, mi) => `${y}-${String(mi + 1).padStart(2, '0')}`
 
 const current  = ref(tzStore.localDateObj())
 const viewMode = ref('month') // 'month' | 'year' | 'decade'
@@ -256,10 +270,10 @@ const decadeYearData = computed(() => {
     const yTrades = tradesStore.trades.filter(t => t.sold_at && getYear(tradeDayDate(t)) === y)
     const monthly = Array.from({ length: 12 }, (_, mi) => {
       const mt = yTrades.filter(t => getMonth(tradeDayDate(t)) === mi)
-      return { label: MONTHS[mi].slice(0, 3), ...aggregateTrades(mt) }
+      return { label: MONTHS[mi].slice(0, 3), ...aggregateTrades(mt, chargesIn(monthPrefix(y, mi))) }
     })
-    const yearAgg = aggregateTrades(yTrades)
-    data[y] = { ...yearAgg, months: monthly, hasData: yearAgg.trades > 0 }
+    const yearAgg = aggregateTrades(yTrades, chargesIn(String(y)))
+    data[y] = { ...yearAgg, months: monthly, hasData: yearAgg.trades > 0 || yearAgg.charges !== 0 }
   }
   return data
 })
@@ -344,7 +358,7 @@ const monthTrades = computed(() => tradesStore.trades.filter(t => {
   return getMonth(d) === getMonth(current.value) && getYear(d) === getYear(current.value)
 }))
 
-const monthStats  = computed(() => computeStats(monthTrades.value))
+const monthStats  = computed(() => computeStats(monthTrades.value, chargesIn(format(current.value, 'yyyy-MM'))))
 const isCurrentMonth = computed(() => {
   const today = tzStore.localDateObj()
   return getMonth(current.value) === getMonth(today) && getYear(current.value) === getYear(today)
@@ -361,21 +375,22 @@ const calendarRows = computed(() => {
     const days = eachDayOfInterval({ start: ws, end: endOfWeek(ws, { weekStartsOn: 0 }) }).map(d => {
       const ds = d.toDateString()
       const dt = monthTrades.value.filter(t => tradeDayDate(t)?.toDateString() === ds)
+      const dc = isSameMonth(d, current.value) ? chargesIn(format(d, 'yyyy-MM-dd')) : []
       return {
         date: d, num: d.getDate(),
         inMonth: isSameMonth(d, current.value),
         isToday: ds === today.toDateString(),
         isFuture: d > today,
-        ...aggregateTrades(dt),
+        ...aggregateTrades(dt, dc),
       }
     })
-    const active = days.filter(d => d.inMonth && !d.isFuture && d.trades > 0)
+    const active = days.filter(d => d.inMonth && !d.isFuture && (d.trades > 0 || d.charges !== 0))
     return {
       days,
       weekPnl:    active.reduce((s, d) => s + d.pnl, 0),
       weekTrades: active.reduce((s, d) => s + d.trades, 0),
       weekWins:   active.reduce((s, d) => s + d.wins, 0),
-      weekDays:   new Set(active.map(d => d.date.toDateString())).size,
+      weekDays:   active.filter(d => d.trades > 0).length,
     }
   })
 })
@@ -386,7 +401,7 @@ const yearTrades = computed(() => tradesStore.trades.filter(t => {
   return getYear(tradeDayDate(t)) === getYear(current.value)
 }))
 
-const yearStats = computed(() => computeStats(yearTrades.value))
+const yearStats = computed(() => computeStats(yearTrades.value, chargesIn(format(current.value, 'yyyy'))))
 
 const yearMonths = computed(() => {
   const today = tzStore.localDateObj()
@@ -395,10 +410,15 @@ const yearMonths = computed(() => {
     const mt = yearTrades.value.filter(t => getMonth(tradeDayDate(t)) === mi)
 
     // Build daily pnl map for this month
+    const mc = chargesIn(monthPrefix(yr, mi))
     const pnlByDay = {}
     for (const t of mt) {
       const key = tradeDayDate(t).getDate()
       pnlByDay[key] = (pnlByDay[key] || 0) + t.pnl
+    }
+    for (const f of mc) {
+      const key = Number(f.date.slice(8, 10))
+      pnlByDay[key] = (pnlByDay[key] || 0) + f.amount
     }
 
     // Days in month
@@ -420,7 +440,7 @@ const yearMonths = computed(() => {
 
     return {
       month: mi, label,
-      ...aggregateTrades(mt),
+      ...aggregateTrades(mt, mc),
       isCurrentMonth: mi === getMonth(today) && yr === getYear(today),
       startOffset: firstDow,
       days,

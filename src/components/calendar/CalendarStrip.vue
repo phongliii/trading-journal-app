@@ -18,8 +18,8 @@
         class="relative min-h-[100px] border-r border-border p-2.5 transition-colors"
         :class="[
           di === 0 ? 'rounded-bl-2xl' : '',
-          !day.isFuture && day.trades > 0 && day.pnl > 0  ? 'bg-up/5'   : '',
-          !day.isFuture && day.trades > 0 && day.pnl < 0  ? 'bg-down/5' : '',
+          !day.isFuture && hasActivity(day) && day.pnl > 0  ? 'bg-up/5'   : '',
+          !day.isFuture && hasActivity(day) && day.pnl < 0  ? 'bg-down/5' : '',
           day.isFuture ? 'opacity-35' : 'hover:bg-surface-3/40 cursor-pointer',
         ]"
         @click="!day.isFuture && onDayClick(day.date, $event)">
@@ -35,13 +35,18 @@
           </div>
         </div>
 
-        <div v-if="day.trades > 0" class="space-y-1">
+        <div v-if="hasActivity(day)" class="space-y-1">
           <div class="font-mono text-sm font-bold leading-none" :class="day.pnl > 0 ? 'text-up' : 'text-down'">
             <CompactValue :value="day.pnl" />
           </div>
-          <div class="text-2xs text-ink-muted">{{ day.trades }} trade{{ day.trades !== 1 ? 's' : '' }}</div>
-          <div class="text-2xs" :class="(day.wins / day.trades) >= 0.5 ? 'text-up/70' : 'text-down/70'">
-            {{ fmtPct((day.wins / day.trades) * 100) }} wr
+          <template v-if="day.trades > 0">
+            <div class="text-2xs text-ink-muted">{{ day.trades }} trade{{ day.trades !== 1 ? 's' : '' }}</div>
+            <div class="text-2xs" :class="(day.wins / day.trades) >= 0.5 ? 'text-up/70' : 'text-down/70'">
+              {{ fmtPct((day.wins / day.trades) * 100) }} wr
+            </div>
+          </template>
+          <div v-if="day.charges" class="text-2xs text-ink-faint truncate" :title="day.chargeLabels.join(', ')">
+            {{ day.chargeLabels.join(', ') || 'Account fee' }} <CompactValue :value="day.charges" />
           </div>
         </div>
         <!-- Marked "No-trade day" in the Journal check-in -->
@@ -53,7 +58,7 @@
           <div class="text-2xs text-ink-faint/40">0 trades</div>
         </div>
 
-        <div v-if="day.trades > 0" class="absolute bottom-0 left-0 right-0 h-0.5"
+        <div v-if="hasActivity(day)" class="absolute bottom-0 left-0 right-0 h-0.5"
           :class="day.pnl >= 0 ? 'bg-up' : 'bg-down'" />
 
         <DayNoteOverlay v-if="isNoteOpen(day.date)" :has-entry="noteTarget.hasEntry"
@@ -104,7 +109,14 @@ import HolidayIcon from '@/components/calendar/HolidayIcon.vue'
 import DayNoteOverlay from '@/components/calendar/DayNoteOverlay.vue'
 import { useCalendarNotes } from '@/composables/useCalendarNotes'
 
-const props = defineProps({ trades: { type: Array, required: true } })
+const props = defineProps({
+  trades: { type: Array, required: true },
+  // Account fees/credits — counted in each day's P&L (lib/accountCharges.js).
+  charges: { type: Array, default: () => [] },
+})
+
+// A day with trades or an account fee/credit.
+const hasActivity = (day) => day.trades > 0 || day.charges !== 0
 
 const journalStore = useJournalStore()
 // Day clicks: overlay with Open note / Create note + Close.
@@ -135,10 +147,12 @@ const week = computed(() => {
   return eachDayOfInterval({ start: weekStart.value, end: weekEnd.value }).map(d => {
     const ds = d.toDateString()
     const dayTrades = props.trades.filter(t => tradeDayDate(t)?.toDateString() === ds)
+    const key = format(d, 'yyyy-MM-dd')
+    const dayCharges = props.charges.filter(f => f.date === key)
     return {
       dateStr: ds, date: d, num: d.getDate(), dayName: format(d, 'EEE'),
       isToday: ds === today.toDateString(), isFuture: d > today,
-      ...aggregateTrades(dayTrades),
+      ...aggregateTrades(dayTrades, dayCharges),
     }
   })
 })
