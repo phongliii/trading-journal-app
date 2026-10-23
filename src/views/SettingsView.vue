@@ -427,7 +427,7 @@
         </div>
 
         <div class="flex gap-2 pt-1 items-center">
-          <button class="btn btn-danger btn-sm ml-auto" @click="resetOpen = true">Reset…</button>
+          <button class="btn btn-danger btn-sm ml-auto" @click="resetOpen = true">Reset</button>
         </div>
       </div>
     </div>

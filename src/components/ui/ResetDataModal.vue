@@ -2,7 +2,7 @@
   <FileImportModal
     :open="open" title="Reset data"
     subtitle="Choose what to delete. This can't be undone."
-    action-label="Reset…" danger :disabled="!parts.length && !settings"
+    action-label="Reset" danger :disabled="!parts.length && !settings"
     @close="$emit('close')" @submit="submit">
 
     <!-- Which portfolio -->
