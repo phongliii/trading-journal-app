@@ -24,7 +24,12 @@
         </div>
         <div class="flex items-center justify-between gap-2 px-1 mb-1">
           <span class="text-2xs text-ink-faint truncate">{{ periodLabel }} · {{ currentEntries.length }} entr{{ currentEntries.length === 1 ? 'y' : 'ies' }}</span>
-          <div class="flex gap-2 flex-shrink-0">
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <button v-if="tabUnreadKeys.length" type="button"
+              class="text-2xs text-brand hover:underline whitespace-nowrap"
+              @click="markTabRead">
+              Mark all read
+            </button>
             <DatePickerCalendar :mode="activeTab" :existing="existingNoteKeys" @create="createNote" @open="openNote" />
           </div>
         </div>
@@ -584,6 +589,17 @@ const tabs = computed(() => [
   { id: 'weekly',  label: 'Weekly',  unread: journalStore.unreadWeekly },
   { id: 'monthly', label: 'Monthly', unread: 0 },
 ])
+
+// Unread entries on the open tab — every period, not just the one shown.
+const tabUnreadKeys = computed(() => {
+  const map = { daily: journalStore.dailyEntries, weekly: journalStore.weeklyEntries, monthly: journalStore.monthlyEntries }
+  return (map[activeTab.value] || []).filter(e => !e.isRead).map(e => e.key)
+})
+async function markTabRead() {
+  const keys = tabUnreadKeys.value
+  await journalStore.markAllRead(keys)
+  toast.success(`Marked ${keys.length} entr${keys.length === 1 ? 'y' : 'ies'} read`)
+}
 
 const currentEntries = computed(() => {
   const map = { daily: journalStore.dailyEntries, weekly: journalStore.weeklyEntries, monthly: journalStore.monthlyEntries }

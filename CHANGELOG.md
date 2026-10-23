@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Added
+- **Mark all read** in the Journal: one click marks every unread entry on
+  the open tab (Daily or Weekly, every period — not just the month shown)
+  as read, saved to the cloud in one batch.
 - **CI:** a GitHub Actions workflow runs the tests and a production build on
   every pull request and every push to main, so each PR shows ✓ / ✕ before
   it's merged.

@@ -102,6 +102,22 @@ export const journalAdapter = {
     if (error) throw error
   },
 
+  // Marks many entries read in one go (Journal's "Mark all read"). An upsert,
+  // like setRead — a daily entry derived from trades may have no row yet —
+  // that only sets `read`, so content already saved is left alone. Chunked to
+  // keep each request small.
+  async markReadMany(accountId, keys) {
+    if (!keys.length) return
+    const sb = getSupabase()
+    const userId = await getUserId(sb)
+    const now = new Date().toISOString()
+    for (let i = 0; i < keys.length; i += 200) {
+      const rows = keys.slice(i, i + 200).map(key => ({ user_id: userId, account_id: accountId, key, read: true, updated_at: now }))
+      const { error } = await sb.from('journal_entries').upsert(rows, { onConflict: 'user_id,account_id,key' })
+      if (error) throw error
+    }
+  },
+
   async deleteEntry(accountId, key) {
     const sb = getSupabase()
     const userId = await getUserId(sb)
