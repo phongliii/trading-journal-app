@@ -3,6 +3,7 @@
 // `trades` must be EVERY trade in the portfolio — never a date-filtered
 // list. (The balance once added the P&L of only the last 30 days' trades, so
 // it moved by itself each day as old trades fell out of that window.)
+import { tradeDay } from './tradeDay'
 
 const sumPnl = (trades) => trades.reduce((s, t) => s + t.pnl, 0)
 
@@ -20,7 +21,7 @@ export function computeCorrectStarting({ rawStarting, earliestBalanceDate }, fun
   const day1 = earliestBalanceDate
   if (!day1) return rawStarting
   const day1Funds = fundTransactions.filter(t => t.date <= day1).reduce((s, t) => s + t.amount, 0)
-  const priorPnl = sumPnl(trades.filter(t => t.sold_at && t.sold_at.slice(0, 10) < day1))
+  const priorPnl = sumPnl(trades.filter(t => t.sold_at && tradeDay(t) < day1))
   return rawStarting - day1Funds - priorPnl
 }
 

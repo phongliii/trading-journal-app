@@ -9,6 +9,7 @@
 
 <script setup>
 import { ref, onBeforeUnmount } from 'vue'
+import { tradeDayDate } from '@/lib/tradeDay'
 import { Chart, LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
 import { format, parseISO } from 'date-fns'
 import { createExternalTooltip } from '@/lib/chartTooltip'
@@ -63,7 +64,7 @@ function makeConfig() {
     // Weekly: group by day, show end-of-day cumulative with date label
     const byDay = {}
     for (const t of sorted) {
-      const day = format(parseISO(t.sold_at), 'MMM d')
+      const day = format(tradeDayDate(t), 'MMM d')
       if (!byDay[day]) byDay[day] = 0
       byDay[day] += t.pnl
     }

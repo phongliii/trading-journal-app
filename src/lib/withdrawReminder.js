@@ -10,6 +10,7 @@
 // starts over.
 import { format, startOfWeek, endOfWeek, addDays } from 'date-fns'
 import { computeCurrentBalance } from './balance'
+import { tradeDay } from './tradeDay'
 
 const ymd = (d) => format(d, 'yyyy-MM-dd')
 
@@ -54,7 +55,7 @@ export function shouldRemindWithdraw({ today, isHoliday, threshold, balanceData,
   const balanceAtStart = computeCurrentBalance(
     balanceData,
     fundTransactions.filter(t => t.date < firstStr),
-    trades.filter(t => !t.sold_at || t.sold_at.slice(0, 10) < firstStr),
+    trades.filter(t => !t.sold_at || tradeDay(t) < firstStr),
   )
   if (balanceAtStart < threshold) return false
 

@@ -1,4 +1,5 @@
 import { format, parseISO, getDay, getMonth, startOfWeek, endOfWeek, eachDayOfInterval, startOfMonth, endOfMonth, isSameMonth, isToday, startOfYear, endOfYear, subYears, subMonths, startOfQuarter, endOfQuarter, subQuarters } from 'date-fns'
+import { tradeDay, tradeDayDate } from '@/lib/tradeDay'
 
 export function computeStats(trades) {
   if (!trades || trades.length === 0) return emptyStats()
@@ -34,14 +35,14 @@ export function computeStats(trades) {
   let cumulative = 0
   const equityCurve = sorted.map(t => {
     cumulative += t.pnl
-    return { date: t.sold_at, value: cumulative }
+    return { date: tradeDay(t), value: cumulative }
   })
 
   // Daily P&L bars (for bar chart above equity curve)
   const dailyMap = {}
   for (const t of sorted) {
-    if (!t.sold_at) continue
-    const key = format(new Date(t.sold_at), 'yyyy-MM-dd')
+    const key = tradeDay(t)
+    if (!key) continue
     dailyMap[key] = (dailyMap[key] || 0) + t.pnl
   }
   const dailyBars = Object.entries(dailyMap)
@@ -84,7 +85,7 @@ export function groupByMonth(trades) {
   MONTHS.forEach((m, i) => { map[i] = { label: m, pnl: 0, trades: 0, wins: 0 } })
 
   for (const t of trades) {
-    const d = t.sold_at ? parseISO(t.sold_at) : null
+    const d = tradeDayDate(t)
     if (!d) continue
     const m = getMonth(d)
     map[m].pnl += t.pnl; map[m].trades++
@@ -103,7 +104,7 @@ export function groupByDow(trades) {
   DAYS.forEach((d, i) => { map[i] = { label: d, pnl: 0, trades: 0, wins: 0 } })
 
   for (const t of trades) {
-    const d = t.sold_at ? parseISO(t.sold_at) : null
+    const d = tradeDayDate(t)
     if (!d) continue
     const dow = getDay(d)
     map[dow].pnl += t.pnl; map[dow].trades++
@@ -144,21 +145,21 @@ export function resolvePeriodRange(option, today) {
 // selector) has no single year to anchor to.
 export function filterTradesByMonth(trades, monthIndex, year) {
   return trades.filter(t => {
-    if (!t.sold_at) return false
-    const d = parseISO(t.sold_at)
+    const d = tradeDayDate(t)
+    if (!d) return false
     if (getMonth(d) !== monthIndex) return false
     if (year !== null && d.getFullYear() !== year) return false
     return true
   })
 }
 
-// Filters trades to a [from, to] window (inclusive), by sold_at. Passing
+// Filters trades to a [from, to] window (inclusive), by trading day. Passing
 // nulls for both returns every trade unfiltered.
 export function filterTradesByDateRange(trades, from, to) {
   if (!from && !to) return trades
   return trades.filter(t => {
-    if (!t.sold_at) return false
-    const d = parseISO(t.sold_at)
+    const d = tradeDayDate(t)
+    if (!d) return false
     if (from && d < from) return false
     if (to && d > to) return false
     return true
@@ -184,7 +185,7 @@ export function calendarWeek(trades) {
 
   return days.map(d => {
     const ds = d.toDateString()
-    const dayTrades = trades.filter(t => t.sold_at && new Date(t.sold_at).toDateString() === ds)
+    const dayTrades = trades.filter(t => tradeDayDate(t)?.toDateString() === ds)
     const pnl = dayTrades.reduce((s, t) => s + t.pnl, 0)
     const fees = dayTrades.reduce((s, t) => s + (t.fees || 0), 0)
     return {
@@ -213,7 +214,7 @@ export function calendarMonth(trades, currentDate) {
 
   return days.map(d => {
     const ds = d.toDateString()
-    const dayTrades = trades.filter(t => t.sold_at && new Date(t.sold_at).toDateString() === ds)
+    const dayTrades = trades.filter(t => tradeDayDate(t)?.toDateString() === ds)
     const pnl = dayTrades.reduce((s, t) => s + t.pnl, 0)
     return {
       date: d, num: d.getDate(),
@@ -397,16 +398,19 @@ export function computeDrawdownFromEvents(events, from = null, to = null, dailyR
  * @returns {Array<{date: string, value: number}>}
  */
 export function computeBalanceCurve(trades, fundTransactions, startingBalance) {
+  // Each point is dated by its trading day (an evening trade belongs to the
+  // next day's session, like the broker's own cash entries for it) but kept
+  // in the order things actually happened (`at`).
   const events = []
   for (const t of trades) {
     if (!t.sold_at) continue
-    events.push({ date: t.sold_at, delta: t.pnl })
+    events.push({ date: tradeDay(t), at: t.sold_at, delta: t.pnl })
   }
   for (const f of fundTransactions || []) {
     if (!f.date) continue
-    events.push({ date: f.date, delta: f.amount })
+    events.push({ date: f.date, at: f.date, delta: f.amount })
   }
-  events.sort((a, b) => a.date.localeCompare(b.date))
+  events.sort((a, b) => a.at.localeCompare(b.at))
 
   let cumulative = startingBalance || 0
   return events.map(e => {
@@ -495,7 +499,7 @@ export function computeRevengeTrading(trades, windowMinutes = 15) {
 export function computeOvertrading(trades, highVolumeThreshold = 15) {
   const byDay = {}
   for (const t of trades) {
-    const day = t.sold_at?.slice(0, 10)
+    const day = tradeDay(t)
     if (!day) continue
     if (!byDay[day]) byDay[day] = []
     byDay[day].push(t)

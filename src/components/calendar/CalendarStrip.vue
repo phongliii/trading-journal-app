@@ -94,6 +94,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { tradeDayDate } from '@/lib/tradeDay'
 import { fmtPct, aggregateTrades } from '@/lib/stats'
 import { useJournalStore } from '@/stores/journal'
 import { useTimezoneStore } from '@/stores/timezone'
@@ -133,7 +134,7 @@ const week = computed(() => {
   const today = tzStore.localDateObj()
   return eachDayOfInterval({ start: weekStart.value, end: weekEnd.value }).map(d => {
     const ds = d.toDateString()
-    const dayTrades = props.trades.filter(t => t.sold_at && new Date(t.sold_at).toDateString() === ds)
+    const dayTrades = props.trades.filter(t => tradeDayDate(t)?.toDateString() === ds)
     return {
       dateStr: ds, date: d, num: d.getDate(), dayName: format(d, 'EEE'),
       isToday: ds === today.toDateString(), isFuture: d > today,
