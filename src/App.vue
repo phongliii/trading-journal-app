@@ -327,10 +327,10 @@ watch(() => accountsStore.activeAccountId, async (id, prevId) => {
   // data this switch is already fetching.
   markCloudRefreshed(ALL_CLOUD_STORES)
   switchingPortfolio = true
+  // Charts wait for the data they draw (trades, balance, cash events) — not
+  // for the journal or the CSV backup, which load alongside.
   const loadAll = () => Promise.all([
-    tradesStore.load(),
-    balanceStore.load(),
-    cashEventsStore.load(),
+    holdDraws(() => Promise.all([tradesStore.load(), balanceStore.load(), cashEventsStore.load()])),
     journalStore.load(),
     rawCsvArchiveStore.load(),
   ])
@@ -339,7 +339,7 @@ watch(() => accountsStore.activeAccountId, async (id, prevId) => {
     // portfolio's data is in — a cover on top of that is one too many. Other
     // pages have no placeholder, so they keep the cover rather than showing
     // the old portfolio's data for a moment.
-    if (PAGES_WITH_SKELETON.has(route.name)) await holdDraws(loadAll)
+    if (PAGES_WITH_SKELETON.has(route.name)) await loadAll()
     else await busy.run('Switching portfolio…', loadAll)
   } finally {
     switchingPortfolio = false
