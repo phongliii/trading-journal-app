@@ -63,7 +63,7 @@ const target = ref(props.activeId)
 const parts = ref(RESET_PARTS.map(p => p.id))
 const settings = ref(false)
 
-// Fresh defaults each time it opens: the open portfolio, all of its data, no settings.
+// Fresh defaults each time it opens: the active portfolio, all of its data, no settings.
 watch(() => props.open, open => {
   if (!open) return
   target.value = props.activeId ?? props.portfolios[0]?.id
@@ -72,7 +72,7 @@ watch(() => props.open, open => {
 })
 
 const targetOptions = computed(() => [
-  ...props.portfolios.map(p => ({ value: p.id, label: p.id === props.activeId ? `${p.name} (open)` : p.name })),
+  ...props.portfolios.map(p => ({ value: p.id, label: p.id === props.activeId ? `${p.name} (active)` : p.name })),
   ...(props.portfolios.length > 1 ? [{ value: 'all', label: `All portfolios (${props.portfolios.length})` }] : []),
 ])
 const targetName = computed(() => props.portfolios.find(p => p.id === target.value)?.name || '')
