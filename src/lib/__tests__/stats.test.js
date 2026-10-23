@@ -108,10 +108,16 @@ describe('aggregateTrades', () => {
   it('sums pnl and counts gross winners', () => {
     expect(aggregateTrades([
       trade(10, 'x'), trade(-4, 'x', { gross_pnl: 1 }), trade(-6, 'x'),
-    ])).toEqual({ pnl: 0, trades: 3, wins: 2, winRate: (2 / 3) * 100 })
+    ])).toEqual({ pnl: 0, charges: 0, chargeLabels: [], trades: 3, wins: 2, winRate: (2 / 3) * 100 })
   })
   it('handles empty input', () => {
-    expect(aggregateTrades([])).toEqual({ pnl: 0, trades: 0, wins: 0, winRate: 0 })
+    expect(aggregateTrades([])).toEqual({ pnl: 0, charges: 0, chargeLabels: [], trades: 0, wins: 0, winRate: 0 })
+  })
+  it('adds account fees to pnl only, not to trades or win rate', () => {
+    const fee = { date: '2026-10-23', amount: -50, type: 'fee', label: 'Liquidation Fee' }
+    expect(aggregateTrades([trade(10, 'x')], [fee])).toEqual({
+      pnl: -40, charges: -50, chargeLabels: ['Liquidation Fee'], trades: 1, wins: 1, winRate: 100,
+    })
   })
 })
 

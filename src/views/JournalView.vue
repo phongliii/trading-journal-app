@@ -101,9 +101,12 @@
             </button>
             <input ref="chartFileInput" type="file" accept="image/*" class="hidden" @change="onChartFileSelected" />
           </div>
-          <div v-if="dayStats.total > 0" class="text-sm font-mono font-semibold mt-1"
+          <div v-if="dayStats.total > 0 || dayStats.accountFees" class="text-sm font-mono font-semibold mt-1"
             :class="dayStats.pnl >= 0 ? 'text-up' : 'text-down'">
             Net P&L {{ fmt(dayStats.pnl) }}
+            <span v-if="dayStats.accountFees" class="text-2xs font-sans font-normal text-ink-faint ml-1.5">
+              incl. account fees {{ fmt(-dayStats.accountFees) }}
+            </span>
           </div>
         </div>
 
@@ -415,6 +418,8 @@ import { useTradesStore }   from '@/stores/trades'
 import { useJournalStore }  from '@/stores/journal'
 import { useTimezoneStore } from '@/stores/timezone'
 import { useCashEventsStore } from '@/stores/cashEvents'
+import { useBalanceStore } from '@/stores/balance'
+import { chargesBetween, chargesTotal } from '@/lib/accountCharges'
 import { fmt, fmtPct, computeDrawdownFromEvents } from '@/lib/stats'
 import { format, parseISO, getYear, getMonth, addDays, endOfMonth } from 'date-fns'
 import { requestCloudRefresh } from '@/lib/cloudSync'
@@ -439,6 +444,7 @@ const tradesStore     = useTradesStore()
 const journalStore    = useJournalStore()
 const tzStore         = useTimezoneStore()
 const cashEventsStore = useCashEventsStore()
+const balanceStore    = useBalanceStore()
 const toast           = useToast()
 
 const TRADE_PAGE_SIZE = 4
@@ -958,12 +964,31 @@ const availablePresets = computed(() => {
   return sectionPresets.filter(p => !have.has(p.title.toLowerCase()))
 })
 
+// Date range of the open entry (day, week, or month), 'yyyy-MM-dd'.
+const entryRange = computed(() => {
+  const sel = selected.value
+  if (!sel) return { from: null, to: null }
+  if (sel.type === 'daily') return { from: sel.date, to: sel.date }
+  if (sel.type === 'weekly') {
+    return { from: format(sel.weekStart, 'yyyy-MM-dd'), to: format(addDays(sel.weekStart, 4), 'yyyy-MM-dd') }
+  }
+  const [y, m] = sel.key.split('-').map(Number)
+  return { from: `${y}-${String(m).padStart(2, '0')}-01`, to: format(endOfMonth(new Date(y, m - 1, 1)), 'yyyy-MM-dd') }
+})
+
+// Account fees/credits in the entry's period — part of its Net P&L and Fees
+// (lib/accountCharges.js), not of its trade stats.
+const entryCharges = computed(() =>
+  selected.value ? chargesBetween(balanceStore.accountCharges, entryRange.value.from, entryRange.value.to) : [])
+
 const dayStats = computed(() => {
-  if (!selected.value) return { pnl: 0, fees: 0, wins: 0, losses: 0, breakeven: 0, gross: 0, total: 0 }
+  if (!selected.value) return { pnl: 0, fees: 0, accountFees: 0, wins: 0, losses: 0, breakeven: 0, gross: 0, total: 0 }
   const trades = selected.value.trades
+  const charges = chargesTotal(entryCharges.value)
   return {
-    pnl:       Math.round(trades.reduce((s, t) => s + t.pnl, 0) * 100) / 100,
-    fees:      Math.round(trades.reduce((s, t) => s + (t.fees || 0), 0) * 100) / 100,
+    pnl:       Math.round((trades.reduce((s, t) => s + t.pnl, 0) + charges) * 100) / 100,
+    fees:      Math.round((trades.reduce((s, t) => s + (t.fees || 0), 0) - charges) * 100) / 100,
+    accountFees: Math.round(-charges * 100) / 100,
     // Win/Loss/Breakeven classification uses GROSS P&L (before fees) — matches NinjaTrader convention
     wins:      trades.filter(t => (t.gross_pnl ?? t.pnl) > 0).length,
     losses:    trades.filter(t => (t.gross_pnl ?? t.pnl) < 0).length,
@@ -976,20 +1001,7 @@ const dayStats = computed(() => {
 const statItems = computed(() => {
   const s = dayStats.value
 
-  // Determine date range for this entry (day, week, or month)
-  let from, to
-  if (selected.value.type === 'daily') {
-    from = selected.value.date
-    to   = selected.value.date
-  } else if (selected.value.type === 'weekly') {
-    from = format(selected.value.weekStart, 'yyyy-MM-dd')
-    to   = format(addDays(selected.value.weekStart, 4), 'yyyy-MM-dd')
-  } else {
-    // monthly
-    const [y, m] = selected.value.key.split('-').map(Number)
-    from = `${y}-${String(m).padStart(2, '0')}-01`
-    to   = format(endOfMonth(new Date(y, m - 1, 1)), 'yyyy-MM-dd')
-  }
+  const { from, to } = entryRange.value
 
   const isDaily = selected.value.type === 'daily'
   const { maxDrawdown, realizedHighPnl } = computeDrawdownFromEvents(cashEventsStore.events, from, to + 'T23:59:59', isDaily)
@@ -1001,9 +1013,15 @@ const statItems = computed(() => {
     { label: 'Win Rate',         value: s.total ? fmtPct((s.wins / s.total) * 100) : '—', class: s.total && s.wins / s.total >= 0.5 ? 'text-up' : 'text-down', tip: 'Percentage of trades with positive gross P&L (before fees).' },
     { label: 'Realized High',    raw: realizedHighPnl,    class: 'text-up', tip: 'Maximum cumulative realized P&L, computed from closed trades including fees at time of charge.' },
     { label: 'Max Drawdown',     raw: -maxDrawdown,       class: maxDrawdown > 0 ? 'text-down' : 'text-ink', tip: 'Maximum peak-to-trough equity decline, computed from realized cash flow including fees at time of charge.' },
-    { label: 'Fees',             raw: -s.fees,            class: 'text-down', tip: 'Total fees paid.' },
+    { label: 'Fees',             raw: -s.fees,            class: 'text-down', tip: feesTip(s) },
   ]
 })
+
+function feesTip(s) {
+  if (!entryCharges.value.length) return 'Total fees paid.'
+  const list = entryCharges.value.map(f => `${f.label || 'Account fee'} ${fmt(f.amount)}`).join(', ')
+  return `Total fees paid, including account fees: ${list}.`
+}
 
 function formatDate(date) {
   if (!date) return ''

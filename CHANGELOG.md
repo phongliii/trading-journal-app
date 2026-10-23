@@ -8,6 +8,13 @@
   it's merged.
 
 ### Changed
+- **Account fees count in your P&L.** Charges like a Liquidation Fee or
+  Dormant Fee (and any account credits) are now part of every P&L total —
+  each day, week, month and year on the Calendar and the Dashboard's week
+  strip, the Journal's Net P&L and Fees, the Dashboard's Net P&L card,
+  Realized P&L bars and equity curve. A day with only a fee shows it too.
+  Trade stats (win rate, profit factor, averages, trade counts) and Gross
+  P&L leave them out — a fee isn't a losing trade.
 - Switching portfolio on the **Dashboard** or **Trades** page shows just that
   page's loading placeholder until the new portfolio's data is in, instead of
   the "Switching portfolio…" cover on top of it. Other pages, which have no
