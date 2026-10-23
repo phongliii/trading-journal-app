@@ -276,8 +276,8 @@
     </div>
 
     <ResetDataModal :open="resetOpen"
-      :active-name="accountsStore.activeAccount?.name || 'This portfolio'"
-      :portfolio-count="accountsStore.accounts.length"
+      :portfolios="accountsStore.accounts"
+      :active-id="accountsStore.activeAccountId"
       @close="resetOpen = false" @submit="runReset" />
 
     <AddQuestionModal v-if="showAddQuestion"
@@ -760,10 +760,10 @@ const lastImport = computed(() => {
 // half-done reset; then this browser's cached copy, then a reload so every
 // store starts fresh.
 const resetOpen = ref(false)
-async function runReset({ scope, parts, settings }) {
-  const accounts = scope === 'all' ? accountsStore.accounts : [accountsStore.activeAccount].filter(Boolean)
+async function runReset({ target, parts, settings }) {
+  const accounts = target === 'all' ? accountsStore.accounts : accountsStore.accounts.filter(a => a.id === target)
   const what = RESET_PARTS.filter(p => parts.includes(p.id)).map(p => p.label.toLowerCase())
-  const where = scope === 'all' ? `all ${accounts.length} portfolios` : `"${accounts[0]?.name}"`
+  const where = target === 'all' ? `all ${accounts.length} portfolios` : `"${accounts[0]?.name}"`
   const lines = []
   if (what.length) lines.push(`Delete ${what.join(', ')} from ${where}.`)
   if (settings) lines.push('Reset your settings for every portfolio.')

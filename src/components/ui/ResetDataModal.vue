@@ -8,20 +8,13 @@
     <!-- Which portfolio -->
     <div>
       <div class="text-2xs text-ink-muted font-medium mb-1.5">Portfolio</div>
-      <div class="flex bg-surface-3 rounded-lg p-0.5">
-        <button v-for="opt in scopeOptions" :key="opt.value" type="button"
-          class="flex-1 text-center py-1.5 rounded-md text-2xs transition-colors truncate px-2"
-          :class="scope === opt.value ? 'bg-surface-4 text-ink font-medium' : 'text-ink-faint hover:text-ink-muted'"
-          @click="scope = opt.value">
-          {{ opt.label }}
-        </button>
-      </div>
+      <Dropdown v-model="target" :options="targetOptions" full-width />
     </div>
 
     <!-- What to delete from it -->
     <div>
       <div class="flex items-center justify-between mb-1.5">
-        <span class="text-2xs text-ink-muted font-medium">Delete from {{ scope === 'all' ? 'every portfolio' : activeName }}</span>
+        <span class="text-2xs text-ink-muted font-medium truncate">Delete from {{ target === 'all' ? 'every portfolio' : targetName }}</span>
         <button type="button" class="text-2xs text-brand hover:underline" @click="toggleAll">
           {{ parts.length === RESET_PARTS.length ? 'Select none' : 'Select all' }}
         </button>
@@ -55,37 +48,40 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import FileImportModal from '@/components/ui/FileImportModal.vue'
+import Dropdown from '@/components/ui/Dropdown.vue'
 import { RESET_PARTS } from '@/lib/resetData'
 
 const props = defineProps({
   open:       { type: Boolean, default: false },
-  activeName: { type: String, required: true },
-  portfolioCount: { type: Number, default: 1 },
+  portfolios: { type: Array, required: true }, // [{ id, name }]
+  activeId:   { type: String, default: null },
 })
 const emit = defineEmits(['close', 'submit'])
 
-const scope = ref('this')
+// A portfolio id, or 'all'.
+const target = ref(props.activeId)
 const parts = ref(RESET_PARTS.map(p => p.id))
 const settings = ref(false)
 
-// Fresh defaults each time it opens: this portfolio, all of its data, no settings.
+// Fresh defaults each time it opens: the open portfolio, all of its data, no settings.
 watch(() => props.open, open => {
   if (!open) return
-  scope.value = 'this'
+  target.value = props.activeId ?? props.portfolios[0]?.id
   parts.value = RESET_PARTS.map(p => p.id)
   settings.value = false
 })
 
-const scopeOptions = computed(() => [
-  { value: 'this', label: props.activeName },
-  ...(props.portfolioCount > 1 ? [{ value: 'all', label: `All portfolios (${props.portfolioCount})` }] : []),
+const targetOptions = computed(() => [
+  ...props.portfolios.map(p => ({ value: p.id, label: p.id === props.activeId ? `${p.name} (open)` : p.name })),
+  ...(props.portfolios.length > 1 ? [{ value: 'all', label: `All portfolios (${props.portfolios.length})` }] : []),
 ])
+const targetName = computed(() => props.portfolios.find(p => p.id === target.value)?.name || '')
 
 function toggleAll() {
   parts.value = parts.value.length === RESET_PARTS.length ? [] : RESET_PARTS.map(p => p.id)
 }
 
 function submit() {
-  emit('submit', { scope: scope.value, parts: [...parts.value], settings: settings.value })
+  emit('submit', { target: target.value, parts: [...parts.value], settings: settings.value })
 }
 </script>
