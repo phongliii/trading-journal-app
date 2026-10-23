@@ -39,6 +39,14 @@
   "Chart image"; with text too it adds "(+ chart image)").
 
 ### Fixed
+- **"Could not back up your CSV rows to the cloud" on big imports.** The
+  imported trades were always saved fine, but the backup of your original
+  CSV rows (which later imports read fees from, and Export downloads) was
+  sent as one block that grew with every import — ~6 MB for a long Cash
+  History — and could fail. It's now packed (~15× smaller: 26k Cash History
+  rows go from 5.6 MB to 0.4 MB), and so is the cash-events list behind
+  drawdown (2.4 MB → 0.2 MB). Existing backups still load and are packed on
+  their next save.
 - **Evening trades are filed under the right day.** A futures session opens
   the evening before (CME: 17:00 Central), so a trade closed Thursday 20:30
   belongs to Friday's session — that's the day your broker books it (its

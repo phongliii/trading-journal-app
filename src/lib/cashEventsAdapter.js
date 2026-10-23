@@ -7,6 +7,7 @@
 // per-event) — every call here takes the active account's id.
 
 import { getSupabase, getUserId } from './supabaseClient'
+import { packRows, unpackRows } from './csvRowsCodec'
 
 export const cashEventsAdapter = {
   async load(accountId) {
@@ -19,15 +20,18 @@ export const cashEventsAdapter = {
       .eq('account_id', accountId)
       .maybeSingle()
     if (error) throw error
-    return data?.events || []
+    return unpackRows(data?.events || [])
   },
 
+  // Packed (lib/csvRowsCodec.js): a long Cash History is tens of thousands
+  // of events — megabytes as plain JSON, too big to save reliably.
   async save(accountId, events) {
     const sb = getSupabase()
     const userId = await getUserId(sb)
+    const packed = await packRows(events)
     const { error } = await sb
       .from('cash_events')
-      .upsert({ user_id: userId, account_id: accountId, events, updated_at: new Date().toISOString() }, { onConflict: 'user_id,account_id' })
+      .upsert({ user_id: userId, account_id: accountId, events: packed, updated_at: new Date().toISOString() }, { onConflict: 'user_id,account_id' })
     if (error) throw error
   },
 }
