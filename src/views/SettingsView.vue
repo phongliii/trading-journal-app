@@ -447,20 +447,18 @@
       </div>
     </div>
 
-    <!-- SQL reference -->
+    <!-- SQL reference — hidden until asked for (only needed once, at setup) -->
     <div class="bg-surface-2 border border-border rounded-xl overflow-hidden">
-      <div class="px-5 py-4 border-b border-border">
-        <h2 class="text-sm font-semibold text-ink">Supabase Table Schema</h2>
-        <!-- Auth is wired up (this page's Account section above). The real
-             schema below (every table carries user_id/account_id + Row
-             Level Security) is finished and safe to run — but trades and
-             everything else still live in localStorage: the app itself
-             doesn't talk to these tables yet (lib/supabaseAdapter.js is the
-             next piece of Phase 2), so running this now just has the
-             tables sitting there ready, ahead of the app using them. -->
-        <p class="text-xs text-ink-muted mt-0.5">The app saves everything to these tables. Run this once in the Supabase SQL editor to set them up — if you've already run it, you don't need to again.</p>
+      <div class="px-5 py-4 flex items-center justify-between gap-4" :class="showSchema ? 'border-b border-border' : ''">
+        <div>
+          <h2 class="text-sm font-semibold text-ink">Supabase Table Schema</h2>
+          <p class="text-xs text-ink-muted mt-0.5">The app saves everything to these tables. Run this once in the Supabase SQL editor to set them up — if you've already run it, you don't need to again.</p>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm text-2xs flex-shrink-0" :aria-expanded="showSchema" @click="toggleSchema">
+          {{ showSchema ? 'Hide' : 'Show' }}
+        </button>
       </div>
-      <div class="p-5">
+      <div v-if="showSchema" class="p-5">
         <div class="relative">
           <pre class="bg-surface-1 border border-border rounded-xl p-4 text-xs font-mono text-ink-muted overflow-x-auto leading-relaxed">{{ sql }}</pre>
           <button class="absolute top-3 right-3 btn btn-ghost btn-sm text-2xs" @click="copySql">
@@ -804,6 +802,15 @@ function signOut() {
   // waiting on it — that wait was the source of the lag on click.
   authStore.signOut()
   router.push('/login')
+}
+
+// Schema card: hidden by default, remembered on this browser.
+const SHOW_SCHEMA_KEY = 'edgelog:settings:showSchema'
+const showSchema = ref(false)
+try { showSchema.value = localStorage.getItem(SHOW_SCHEMA_KEY) === '1' } catch { /* storage unavailable */ }
+function toggleSchema() {
+  showSchema.value = !showSchema.value
+  try { localStorage.setItem(SHOW_SCHEMA_KEY, showSchema.value ? '1' : '0') } catch { /* storage unavailable */ }
 }
 
 function copySql() {
