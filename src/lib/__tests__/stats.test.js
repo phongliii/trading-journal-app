@@ -175,7 +175,7 @@ describe('filterTradesByMonth / filterTradesByDateRange', () => {
   const trades = [
     trade(1, '2025-03-10T10:00:00'),
     trade(2, '2026-03-10T10:00:00'),
-    trade(3, '2026-04-30T23:59:00'),
+    trade(3, '2026-04-30T16:59:00'), // last minute of April's last session
     trade(4, null),
   ]
 

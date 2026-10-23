@@ -279,6 +279,7 @@ async function loadCloudDataSequence() {
     tags: { applyFromCloud: tradeMetaStore.applyTagsFromCloud, toCloudValue: tradeMetaStore.tagsToCloudValue },
     strategies: { applyFromCloud: tradeMetaStore.applyStrategiesFromCloud, toCloudValue: tradeMetaStore.strategiesToCloudValue },
     cutoffTime: tradingRulesStore,
+    tradingDayStart: tradingRulesStore.dayStartSync,
     timezone: tzStore,
     withdrawReminder: withdrawReminderStore,
     compactMode: settingsStore,

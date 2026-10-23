@@ -12,6 +12,7 @@ import { journalAdapter } from '@/lib/journalAdapter'
 import { useToast } from '@/composables/useToast'
 import { reportCloudError, reportLoadError, loadWithRetry } from '@/lib/cloudErrors'
 import { sharedLoad } from '@/lib/sharedLoad'
+import { tradeDay, tradeDayDate } from '@/lib/tradeDay'
 
 // Exported (not just module-local) so lib/exportData.js can tell "still at
 // the factory default" apart from "the user actually customized this" when
@@ -527,8 +528,8 @@ export const useJournalStore = defineStore('journal', () => {
   const dailyEntries = computed(() => {
     const byDate = {}
     for (const t of tradesStore.trades) {
-      if (!t.sold_at) continue
-      const date = t.sold_at.slice(0, 10)
+      const date = tradeDay(t)
+      if (!date) continue
       if (!byDate[date]) byDate[date] = []
       byDate[date].push(t)
     }
@@ -555,8 +556,8 @@ export const useJournalStore = defineStore('journal', () => {
     const weeks = new Map()
 
     for (const t of tradesStore.trades) {
-      if (!t.sold_at) continue
-      const d = parseISO(t.sold_at)
+      const d = tradeDayDate(t)
+      if (!d) continue
       const ws = startOfWeek(d, { weekStartsOn: 1 })
       const key = `${format(ws, 'yyyy')}-W${String(getWeek(ws, { weekStartsOn: 1 })).padStart(2, '0')}`
       if (!weeks.has(key)) weeks.set(key, { weekStart: ws, trades: [] })
@@ -601,8 +602,8 @@ export const useJournalStore = defineStore('journal', () => {
     const months = new Map()
 
     for (const t of tradesStore.trades) {
-      if (!t.sold_at) continue
-      const d = parseISO(t.sold_at)
+      const d = tradeDayDate(t)
+      if (!d) continue
       const key = format(d, 'yyyy-MM')
       if (!months.has(key)) months.set(key, { year: getYear(d), month: getMonth(d), trades: [] })
       months.get(key).trades.push(t)

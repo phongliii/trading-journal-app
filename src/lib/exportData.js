@@ -7,6 +7,7 @@
 // to the browser's normal download flow.
 
 import { startOfWeek, addDays, format } from 'date-fns'
+import { tradeDayDate } from '@/lib/tradeDay'
 import { useRawCsvArchiveStore } from '@/stores/rawCsvArchive'
 import { toCsv } from '@/lib/csvParser'
 import { useJournalStore, DEFAULT_CHECKLIST } from '@/stores/journal'
@@ -133,7 +134,7 @@ function gatherTradeNotes(range) {
   const tradesStore = useTradesStore()
   const entries = {}
   for (const t of tradesStore.trades) {
-    if (t.sold_at && (range.from || range.to) && !inRange(new Date(t.sold_at), range.from, range.to)) continue
+    if (t.sold_at && (range.from || range.to) && !inRange(tradeDayDate(t), range.from, range.to)) continue
     const hasContent = (t.notes && t.notes.trim()) || (t.tags && t.tags.length) || t.strategy || t.chartImage
     if (!hasContent) continue
     entries[tradeKey(t)] = { notes: t.notes || '', tags: t.tags || [], strategy: t.strategy || null, chartImage: t.chartImage || null }

@@ -29,6 +29,14 @@
   "Chart image"; with text too it adds "(+ chart image)").
 
 ### Fixed
+- **Evening trades are filed under the right day.** A futures session opens
+  the evening before (CME: 17:00 Central), so a trade closed Thursday 20:30
+  belongs to Friday's session — that's the day your broker books it (its
+  Trade Date, P&L and fees). The journal, calendar, dashboard, Trades page
+  date filter and stats now use that trading day instead of the calendar
+  date, so an evening trade no longer merges into the previous day. The
+  start time is in **Settings → Time → Trading day starts at** (default
+  17:00; set 00:00 for plain calendar days).
 - With no daily check-in questions set up, a journal entry's check-in card
   was an empty box and the check-in only showed the No-trade toggle. Both now
   say there are no questions yet, with a link to add them in Settings (which

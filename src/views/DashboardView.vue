@@ -187,6 +187,7 @@
 
 <script setup>
 import { computed, ref, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
+import { tradeDay, tradeDayDate } from '@/lib/tradeDay'
 import { useTradesStore } from '@/stores/trades'
 import { useAccountsStore } from '@/stores/accounts'
 import { useBalanceStore } from '@/stores/balance'
@@ -224,8 +225,8 @@ const realizedRange = ref('1M')
 const realizedBars = computed(() => {
   const byDay = {}
   for (const t of tradesStore.trades) {
-    if (!t.sold_at) continue
-    const k = format(new Date(t.sold_at), 'yyyy-MM-dd') // same day-bucketing as stats.dailyBars
+    const k = tradeDay(t) // same day-bucketing as stats.dailyBars
+    if (!k) continue
     byDay[k] = (byDay[k] || 0) + t.pnl
   }
   return Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b)).map(([date, pnl]) => ({ date, pnl }))
@@ -242,7 +243,7 @@ const equityRangeFrom = computed(() => {
 // Cumulative net P&L of just the trades in the range, starting from 0.
 const rangePnlCurve = computed(() => {
   const from = equityRangeFrom.value
-  const inRange = from ? tradesStore.trades.filter(t => t.sold_at && t.sold_at.slice(0, 10) >= from) : tradesStore.trades
+  const inRange = from ? tradesStore.trades.filter(t => t.sold_at && tradeDay(t) >= from) : tradesStore.trades
   return computeStats(inRange).equityCurve
 })
 
@@ -435,12 +436,10 @@ const monthAvailableYears = computed(() => {
   const years = new Set([tzStore.localDateObj().getFullYear()])
   for (const t of tradesStore.trades) {
     if (!t.sold_at) continue
-    // sold_at may be an ISO string, a Date, or something else depending on
-    // where the trade came from — go through Date() rather than string
-    // slicing so an unexpected shape here can't silently break the whole
+    // Guarded so an unexpected sold_at shape can't silently break the whole
     // "Pick a year" list (a thrown error in a computed renders nothing).
-    const d = new Date(t.sold_at)
-    if (!Number.isNaN(d.getTime())) years.add(d.getFullYear())
+    const d = tradeDayDate(t)
+    if (d && !Number.isNaN(d.getTime())) years.add(d.getFullYear())
   }
   return [...years].sort((a, b) => a - b)
 })

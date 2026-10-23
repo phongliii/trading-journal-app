@@ -169,7 +169,7 @@
                 <span v-else-if="(t.gross_pnl ?? t.pnl) < 0" class="badge-down">Loss</span>
                 <span v-else class="badge-neutral">Breakeven</span>
               </td>
-              <td class="text-ink-faint text-xs whitespace-nowrap">{{ fmtDay(t.sold_at) }}</td>
+              <td class="text-ink-faint text-xs whitespace-nowrap">{{ fmtDay(tradeDay(t)) }}</td>
               <td class="text-ink-faint text-xs whitespace-nowrap font-mono">
                 {{ fmtTime(t.bought_at) }} <span class="text-ink-faint/50">→</span> {{ fmtTime(t.sold_at) }}
               </td>
@@ -209,6 +209,7 @@
 
 <script setup>
 import { useConfirm } from '@/composables/useConfirm'
+import { tradeDay } from '@/lib/tradeDay'
 const { confirm: $confirm } = useConfirm()
 import { useBusy } from '@/composables/useBusy'
 const busy = useBusy()
@@ -258,12 +259,12 @@ const rangeEnd    = ref('')
 const dayTrades = computed(() => {
   if (rangeStart.value && rangeEnd.value) {
     return tradesStore.trades.filter(t => {
-      const d = t.sold_at?.slice(0, 10)
+      const d = tradeDay(t)
       return d && d >= rangeStart.value && d <= rangeEnd.value
     })
   }
   if (filterDate.value) {
-    return tradesStore.trades.filter(t => t.sold_at?.slice(0, 10) === filterDate.value)
+    return tradesStore.trades.filter(t => tradeDay(t) === filterDate.value)
   }
   return []
 })
@@ -372,11 +373,11 @@ const shown = computed(() => {
   // Date filter
   if (rangeStart.value && rangeEnd.value) {
     list = list.filter(t => {
-      const d = t.sold_at?.slice(0, 10)
+      const d = tradeDay(t)
       return d && d >= rangeStart.value && d <= rangeEnd.value
     })
   } else if (filterDate.value) {
-    list = list.filter(t => t.sold_at?.slice(0, 10) === filterDate.value)
+    list = list.filter(t => tradeDay(t) === filterDate.value)
   }
 
   list = [...list].sort((a, b) => {

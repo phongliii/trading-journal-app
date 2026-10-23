@@ -211,7 +211,7 @@
                     </td>
                     <!-- Same as the Trades page; weekly/monthly tables mix days, so add the date there -->
                     <td class="text-ink-faint text-xs whitespace-nowrap font-mono">
-                      <template v-if="selected.type !== 'daily'">{{ fmtTradeDay(t.sold_at) }} · </template>{{ fmtTradeTime(t.bought_at) }} <span class="text-ink-faint/50">→</span> {{ fmtTradeTime(t.sold_at) }}
+                      <template v-if="selected.type !== 'daily'">{{ fmtTradeDay(tradeDay(t)) }} · </template>{{ fmtTradeTime(t.bought_at) }} <span class="text-ink-faint/50">→</span> {{ fmtTradeTime(t.sold_at) }}
                     </td>
                     <td class="text-ink-faint text-xs whitespace-nowrap">{{ t.duration || '—' }}</td>
                   </tr>
@@ -407,6 +407,7 @@
 
 <script setup>
 import { useConfirm } from '@/composables/useConfirm'
+import { tradeDay } from '@/lib/tradeDay'
 const { confirm: $confirm } = useConfirm()
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'

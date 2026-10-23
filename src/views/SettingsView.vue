@@ -25,6 +25,19 @@
             <Dropdown v-else v-model="manualTzValue" :options="timezoneOptions" />
           </div>
         </div>
+        <!-- Trading day start row -->
+        <div class="flex items-center justify-between gap-6 px-5 py-4">
+          <div>
+            <span class="text-sm text-ink">Trading day starts at</span>
+            <p class="text-xs text-ink-faint mt-0.5">
+              Trades closed at or after this time count toward the next day, like your broker's Trade Date
+              (futures sessions open the evening before). Set 00:00 to use calendar days.
+            </p>
+          </div>
+          <input type="time" class="input w-auto text-sm flex-shrink-0"
+            :value="tradingRulesStore.dayStart"
+            @change="e => tradingRulesStore.setDayStart(e.target.value)" />
+        </div>
       </div>
     </div>
 
@@ -470,6 +483,7 @@ import Dropdown from '@/components/ui/Dropdown.vue'
 import { useTradesStore }   from '@/stores/trades'
 import { useBalanceStore }  from '@/stores/balance'
 import { useTimezoneStore } from '@/stores/timezone'
+import { useTradingRulesStore } from '@/stores/tradingRules'
 import { useAuthStore }     from '@/stores/auth'
 import { useJournalStore }  from '@/stores/journal'
 import { useImageStorageStore } from '@/stores/imageStorage'
@@ -503,6 +517,7 @@ const authStore     = useAuthStore()
 const tradesStore   = useTradesStore()
 const balanceStore  = useBalanceStore()
 const tzStore       = useTimezoneStore()
+const tradingRulesStore = useTradingRulesStore()
 const journalStore  = useJournalStore()
 const imageStorageStore = useImageStorageStore()
 const withdrawReminderStore = useWithdrawReminderStore()

@@ -217,6 +217,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { tradeDayDate } from '@/lib/tradeDay'
 import { useTradesStore } from '@/stores/trades'
 import { useJournalStore } from '@/stores/journal'
 import { useTimezoneStore } from '@/stores/timezone'
@@ -252,9 +253,9 @@ const decadeYears = computed(() => Array.from({ length: 12 }, (_, i) => decadeSt
 const decadeYearData = computed(() => {
   const data = {}
   for (const y of decadeYears.value) {
-    const yTrades = tradesStore.trades.filter(t => t.sold_at && getYear(parseISO(t.sold_at)) === y)
+    const yTrades = tradesStore.trades.filter(t => t.sold_at && getYear(tradeDayDate(t)) === y)
     const monthly = Array.from({ length: 12 }, (_, mi) => {
-      const mt = yTrades.filter(t => getMonth(parseISO(t.sold_at)) === mi)
+      const mt = yTrades.filter(t => getMonth(tradeDayDate(t)) === mi)
       return { label: MONTHS[mi].slice(0, 3), ...aggregateTrades(mt) }
     })
     const yearAgg = aggregateTrades(yTrades)
@@ -338,8 +339,8 @@ function drillInto(monthIndex) {
 
 // ── Month view ────────────────────────────────────────────────
 const monthTrades = computed(() => tradesStore.trades.filter(t => {
-  if (!t.sold_at) return false
-  const d = parseISO(t.sold_at)
+  const d = tradeDayDate(t)
+  if (!d) return false
   return getMonth(d) === getMonth(current.value) && getYear(d) === getYear(current.value)
 }))
 
@@ -348,7 +349,7 @@ const isCurrentMonth = computed(() => {
   const today = tzStore.localDateObj()
   return getMonth(current.value) === getMonth(today) && getYear(current.value) === getYear(today)
 })
-const tradingDays  = computed(() => new Set(monthTrades.value.map(t => t.sold_at ? new Date(t.sold_at).toDateString() : null).filter(Boolean)).size)
+const tradingDays  = computed(() => new Set(monthTrades.value.map(t => tradeDayDate(t)?.toDateString()).filter(Boolean)).size)
 
 const calendarRows = computed(() => {
   const today = tzStore.localDateObj()
@@ -359,7 +360,7 @@ const calendarRows = computed(() => {
   return weekStarts.map(ws => {
     const days = eachDayOfInterval({ start: ws, end: endOfWeek(ws, { weekStartsOn: 0 }) }).map(d => {
       const ds = d.toDateString()
-      const dt = monthTrades.value.filter(t => t.sold_at && new Date(t.sold_at).toDateString() === ds)
+      const dt = monthTrades.value.filter(t => tradeDayDate(t)?.toDateString() === ds)
       return {
         date: d, num: d.getDate(),
         inMonth: isSameMonth(d, current.value),
@@ -382,7 +383,7 @@ const calendarRows = computed(() => {
 // ── Year view ─────────────────────────────────────────────────
 const yearTrades = computed(() => tradesStore.trades.filter(t => {
   if (!t.sold_at) return false
-  return getYear(parseISO(t.sold_at)) === getYear(current.value)
+  return getYear(tradeDayDate(t)) === getYear(current.value)
 }))
 
 const yearStats = computed(() => computeStats(yearTrades.value))
@@ -391,12 +392,12 @@ const yearMonths = computed(() => {
   const today = tzStore.localDateObj()
   const yr = getYear(current.value)
   return MONTHS.map((label, mi) => {
-    const mt = yearTrades.value.filter(t => getMonth(parseISO(t.sold_at)) === mi)
+    const mt = yearTrades.value.filter(t => getMonth(tradeDayDate(t)) === mi)
 
     // Build daily pnl map for this month
     const pnlByDay = {}
     for (const t of mt) {
-      const key = new Date(t.sold_at).getDate()
+      const key = tradeDayDate(t).getDate()
       pnlByDay[key] = (pnlByDay[key] || 0) + t.pnl
     }
 
