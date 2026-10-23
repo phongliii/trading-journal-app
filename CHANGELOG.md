@@ -11,6 +11,7 @@
   it's merged.
 
 ### Changed
+- Settings: the **Supabase Table Schema** is hidden by default behind a Show / Hide button (remembered on this browser) — it's only needed once, at setup.
 - **Always the latest data when you change page.** Opening a page (or
   coming back to the tab) now always checks the cloud for changes from any
   device — before, a page opened within 15 seconds of the last check could
