@@ -12,7 +12,7 @@
 
 ### Changed
 - **Reset is now a menu, not one big button.** Settings → Reset… opens a
-  window where you pick the portfolio (any one from a dropdown, or all of them) and
+  window where you pick the portfolio (any one from a dropdown — the active one first — or all of them) and
   what to delete — trades; balance, deposits & account fees; cash history;
   journal; backed-up CSV files — and, separately, whether to reset the
   settings every portfolio shares (tags, strategies, check-in questions,
@@ -67,9 +67,9 @@
   belongs to Friday's session — that's the day your broker books it (its
   Trade Date, P&L and fees). The journal, calendar, dashboard, Trades page
   date filter and stats now use that trading day instead of the calendar
-  date, so an evening trade no longer merges into the previous day. The
-  start time is in **Settings → Time → Trading day starts at** (default
-  17:00; set 00:00 for plain calendar days).
+  date, so an evening trade no longer merges into the previous day. It's
+  the **Settings → Time → Futures trading day** toggle (on by default — the
+  day starts at 17:00; off uses plain calendar days).
 - With no daily check-in questions set up, a journal entry's check-in card
   was an empty box and the check-in only showed the No-trade toggle. Both now
   say there are no questions yet, with a link to add them in Settings (which

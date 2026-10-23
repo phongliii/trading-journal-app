@@ -25,18 +25,22 @@
             <Dropdown v-else v-model="manualTzValue" :options="timezoneOptions" />
           </div>
         </div>
-        <!-- Trading day start row -->
+        <!-- Futures trading day row (lib/tradeDay.js) -->
         <div class="flex items-center justify-between gap-6 px-5 py-4">
           <div>
-            <span class="text-sm text-ink">Trading day starts at</span>
+            <span class="text-sm text-ink">Futures trading day</span>
             <p class="text-xs text-ink-faint mt-0.5">
-              Trades closed at or after this time count toward the next day, like your broker's Trade Date
-              (futures sessions open the evening before). Set 00:00 to use calendar days.
+              Trades closed from {{ DEFAULT_TRADING_DAY_START }} count toward the next day, like your broker's Trade Date
+              — futures sessions open the evening before. Off: calendar days.
             </p>
           </div>
-          <input type="time" class="input w-auto text-sm flex-shrink-0"
-            :value="tradingRulesStore.dayStart"
-            @change="e => tradingRulesStore.setDayStart(e.target.value)" />
+          <button @click="tradingRulesStore.setDayStart(futuresDay ? '00:00' : DEFAULT_TRADING_DAY_START)"
+            role="switch" :aria-checked="futuresDay"
+            class="relative w-11 h-6 rounded-full transition-colors flex-shrink-0"
+            :class="futuresDay ? 'bg-brand' : 'bg-surface-4'">
+            <span class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform"
+              :class="futuresDay ? 'translate-x-5' : 'translate-x-0'"></span>
+          </button>
         </div>
       </div>
     </div>
@@ -489,6 +493,7 @@ import { useTradesStore }   from '@/stores/trades'
 import { useBalanceStore }  from '@/stores/balance'
 import { useTimezoneStore } from '@/stores/timezone'
 import { useTradingRulesStore } from '@/stores/tradingRules'
+import { DEFAULT_TRADING_DAY_START } from '@/lib/tradeDay'
 import { useAuthStore }     from '@/stores/auth'
 import { useJournalStore }  from '@/stores/journal'
 import { useImageStorageStore } from '@/stores/imageStorage'
@@ -521,6 +526,8 @@ const tradesStore   = useTradesStore()
 const balanceStore  = useBalanceStore()
 const tzStore       = useTimezoneStore()
 const tradingRulesStore = useTradingRulesStore()
+// On = trades from the session open count toward the next day; off = calendar days.
+const futuresDay = computed(() => tradingRulesStore.dayStart !== '00:00')
 const journalStore  = useJournalStore()
 const imageStorageStore = useImageStorageStore()
 const withdrawReminderStore = useWithdrawReminderStore()
