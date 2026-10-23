@@ -39,6 +39,12 @@
   "Chart image"; with text too it adds "(+ chart image)").
 
 ### Fixed
+- **Unread dots flashed when switching portfolio** — the new portfolio's
+  days were briefly checked against the previous portfolio's read list. The
+  read list now switches straight away (from this device's copy) and dots
+  wait until trades and read state are both the new portfolio's. This also
+  stops a cleanup step from comparing the two portfolios' days mid-switch,
+  which could mark read days unread — in the cloud too.
 - Journal: **+ New** sat a few pixels lower than **Mark all read** next to it.
 - **"Could not back up your CSV rows to the cloud" on big imports.** The
   imported trades were always saved fine, but the backup of your original

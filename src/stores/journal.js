@@ -151,6 +151,21 @@ export const useJournalStore = defineStore('journal', () => {
   // loads the right one once accountId is actually known, same moment it
   // loads everything else for that portfolio.
   const readList = ref([])
+  // Which portfolio readList belongs to. Unread dots wait until it AND the
+  // trades (which the daily entries are built from) are this portfolio's:
+  // right after a switch, the new portfolio's entries were briefly checked
+  // against the old one's readList, so they all flashed unread.
+  const readFor = ref(null)
+  const readKnown = computed(() =>
+    readFor.value === accountsStore.activeAccountId && tradesStore.settledFor === accountsStore.activeAccountId)
+  const showsRead = key => !readKnown.value || readList.value.includes(key)
+  // Which portfolio `data` (the journal entries) belongs to.
+  const dataFor = ref(null)
+  // The read-state cleanup below compares entries before/after a change; it
+  // may only do that once trades, journal data and readList are all this
+  // portfolio's — mid-switch it would compare one portfolio's days with
+  // another's and drop (and push to the cloud) read marks it shouldn't.
+  const consistent = () => readKnown.value && dataFor.value === accountsStore.activeAccountId
   const checklistQuestions = ref(JSON.parse(localStorage.getItem(CHECKLIST_KEY) || 'null') || DEFAULT_CHECKLIST)
   const loading  = ref(false)
   const loaded   = ref(false) // becomes true once load() has completed at least once
@@ -195,8 +210,16 @@ export const useJournalStore = defineStore('journal', () => {
       // portfolio's readList has no bearing on this one at all.
       let localRead = []
       try { localRead = JSON.parse(localStorage.getItem(readKeyFor(accountId)) || '[]') } catch { /* ignore */ }
+      // Switched portfolio: start from this one's cached read list right
+      // away rather than keep showing the last one's until the cloud
+      // answers. With no cache on this device, dots wait for the cloud.
+      if (readFor.value !== accountId) {
+        readList.value = localRead
+        readFor.value = localStorage.getItem(readKeyFor(accountId)) !== null ? accountId : null
+      }
       const { data: cloudData, readList: cloudRead } = await loadWithRetry(() => journalAdapter.load(accountId))
       data.value = cloudData
+      dataFor.value = accountId
 
       // Re-read localStorage now, right before merging, instead of only
       // trusting the snapshot taken above before the cloud fetch started.
@@ -219,6 +242,7 @@ export const useJournalStore = defineStore('journal', () => {
       // and the line below catches the cloud back up to it).
       const merged = new Set([...localRead, ...cloudRead])
       readList.value = [...merged]
+      readFor.value = accountId
       saveRead()
       const localOnly = readList.value.filter(k => !cloudRead.includes(k))
       if (localOnly.length) {
@@ -556,7 +580,7 @@ export const useJournalStore = defineStore('journal', () => {
       .map(([date, trades]) => ({
         key: date, date, trades,
         sections: data.value[date]?.sections || defaultSections(),
-        isRead: readList.value.includes(date),
+        isRead: showsRead(date),
         type: 'daily',
       }))
   })
@@ -603,7 +627,7 @@ export const useJournalStore = defineStore('journal', () => {
         trades,
         label: weekLabel,
         sections: data.value[key]?.sections || weeklyDefaultSections(),
-        isRead: readList.value.includes(key),
+        isRead: showsRead(key),
         type: 'weekly',
       })
     }
@@ -641,7 +665,7 @@ export const useJournalStore = defineStore('journal', () => {
         trades,
         label: format(new Date(year, month, 1), 'MMMM yyyy'),
         sections: data.value[key]?.sections || monthlyDefaultSections(),
-        isRead: readList.value.includes(key),
+        isRead: showsRead(key),
         type: 'monthly',
       })
     }
@@ -657,7 +681,8 @@ export const useJournalStore = defineStore('journal', () => {
     // First invocation after page load: just record the baseline,
     // don't treat every entry as "newly appeared" (which would wipe
     // read state for entries that were already read in a prior session).
-    if (prevDailyKeys === null) {
+    // Same while switching portfolio (see `consistent`).
+    if (prevDailyKeys === null || !consistent()) {
       prevDailyKeys = newKeys
       return
     }
@@ -701,8 +726,8 @@ export const useJournalStore = defineStore('journal', () => {
   watch(weeklyEntries, (newEntries) => {
     const newKeys = new Set(newEntries.map(e => e.key))
 
-    // First invocation after page load: just record the baseline.
-    if (prevWeeklyKeys === null) {
+    // First invocation after page load (or mid-switch): just record the baseline.
+    if (prevWeeklyKeys === null || !consistent()) {
       prevWeeklyKeys = newKeys
       return
     }
