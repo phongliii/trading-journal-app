@@ -1,7 +1,7 @@
 <template>
   <!-- Shared frame for the file-drop popups (Import CSV, Restore Journal
-       Data): backdrop, header with close, scrolling body (default slot),
-       Cancel + action footer. -->
+       Data) and Settings → Reset: backdrop, header with close, scrolling
+       body (default slot), Cancel + action footer. -->
   <Teleport to="body">
     <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" @click.self="$emit('close')">
       <div class="bg-surface-2 border border-border rounded-xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col">
@@ -25,7 +25,7 @@
 
         <div class="px-5 py-4 border-t border-border flex gap-3 flex-shrink-0">
           <button class="btn btn-ghost btn-sm flex-1" @click="$emit('close')">Cancel</button>
-          <button class="btn btn-primary btn-sm flex-1" :disabled="disabled" @click="$emit('submit')">{{ actionLabel }}</button>
+          <button class="btn btn-sm flex-1" :class="danger ? 'btn-danger' : 'btn-primary'" :disabled="disabled" @click="$emit('submit')">{{ actionLabel }}</button>
         </div>
       </div>
     </div>
@@ -41,6 +41,7 @@ defineProps({
   subtitle:    { type: String, default: '' },
   actionLabel: { type: String, default: 'Import' },
   disabled:    { type: Boolean, default: false },
+  danger:      { type: Boolean, default: false }, // red action button
 })
 defineEmits(['close', 'submit'])
 </script>

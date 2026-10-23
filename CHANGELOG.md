@@ -11,6 +11,14 @@
   it's merged.
 
 ### Changed
+- **Reset is now a menu, not one big button.** Settings → Reset… opens a
+  window where you pick the portfolio (the open one, or all of them) and
+  what to delete — trades; balance, deposits & account fees; cash history;
+  journal; backed-up CSV files — and, separately, whether to reset the
+  settings every portfolio shares (tags, strategies, check-in questions,
+  time zone, …). Before, Reset always wiped the open portfolio's data AND
+  the shared settings for every portfolio. A confirmation lists exactly
+  what will go.
 - **Account fees count in your P&L.** Charges like a Liquidation Fee or
   Dormant Fee (and any account credits) are now part of every P&L total —
   each day, week, month and year on the Calendar and the Dashboard's week
