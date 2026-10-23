@@ -275,6 +275,11 @@
       </div>
     </div>
 
+    <ResetDataModal :open="resetOpen"
+      :active-name="accountsStore.activeAccount?.name || 'This portfolio'"
+      :portfolio-count="accountsStore.accounts.length"
+      @close="resetOpen = false" @submit="runReset" />
+
     <AddQuestionModal v-if="showAddQuestion"
       :existing-texts="checklistDraft.map(q => q.text)"
       @add="addChecklistQuestion"
@@ -419,7 +424,7 @@
         </div>
 
         <div class="flex gap-2 pt-1 items-center">
-          <button class="btn btn-danger btn-sm ml-auto" @click="resetAll">Reset</button>
+          <button class="btn btn-danger btn-sm ml-auto" @click="resetOpen = true">Reset…</button>
         </div>
       </div>
     </div>
@@ -488,18 +493,16 @@ import { useAuthStore }     from '@/stores/auth'
 import { useJournalStore }  from '@/stores/journal'
 import { useImageStorageStore } from '@/stores/imageStorage'
 import { useHolidayStore }  from '@/stores/holidays'
-import { useCashEventsStore } from '@/stores/cashEvents'
 import { useWithdrawReminderStore } from '@/stores/withdrawReminder'
 import { useTradeMetaStore } from '@/stores/tradeMeta'
 import { useAccountsStore } from '@/stores/accounts'
-import { useRawCsvArchiveStore } from '@/stores/rawCsvArchive'
 import { fundStatus } from '@/lib/balance'
-import { journalAdapter } from '@/lib/journalAdapter'
-import { clearCloudSettings } from '@/lib/cloudSettings'
 import { useToast }         from '@/composables/useToast'
 import { format } from 'date-fns'
 import draggable from 'vuedraggable'
 import AddQuestionModal from '@/components/ui/AddQuestionModal.vue'
+import ResetDataModal from '@/components/ui/ResetDataModal.vue'
+import { RESET_PARTS, resetCloud, resetLocal, resetStepCount } from '@/lib/resetData'
 import AddTextItemModal from '@/components/ui/AddTextItemModal.vue'
 import pkg from '../../package.json'
 // The actual schema file, not a copy — this panel used to carry a
@@ -523,7 +526,6 @@ const imageStorageStore = useImageStorageStore()
 const withdrawReminderStore = useWithdrawReminderStore()
 const tradeMetaStore = useTradeMetaStore()
 const accountsStore = useAccountsStore()
-const rawCsvArchiveStore = useRawCsvArchiveStore()
 const withdrawAmount = computed({
   get: () => withdrawReminderStore.amount,
   set: (v) => {
@@ -613,7 +615,6 @@ async function removeChecklistQuestion(id) {
   checklistDraft.value = journalStore.checklistQuestions.map(q => ({ ...q }))
 }
 const holidaysStore = useHolidayStore()
-const cashEventsStore = useCashEventsStore()
 const toast  = useToast()
 const copied = ref(false)
 
@@ -753,42 +754,30 @@ const lastImport = computed(() => {
   try { return format(dates[0], 'MMM d') } catch { return '—' }
 })
 
-// Factory reset for the active account: deletes its trades, journal, balance,
-// cash events and backed-up CSVs from the cloud, deletes the cloud settings
-// row, then wipes this browser's local data — everything except the
-// Supabase login token (`sb-…`), so you stay signed in. Cloud steps run
-// first and abort on the first failure, so a half-failed reset never wipes
-// the local side and can simply be retried.
-async function resetAll() {
-  if (!await $confirm({
-    title: 'Reset Everything',
-    message: 'This permanently deletes this account\'s trades, journal, balance, cash history and backed-up CSVs from the cloud, plus your tags, strategies, rules and other preferences. Local data on this browser is cleared too. You stay signed in. This cannot be undone.',
-    confirmLabel: 'Reset Everything',
-    danger: true
-  })) return
+// Settings → Reset: the modal picks which portfolio(s), which kinds of
+// data, and whether the shared settings go too (lib/resetData.js). Cloud
+// first, stopping at the first failure so nothing local is cleared by a
+// half-done reset; then this browser's cached copy, then a reload so every
+// store starts fresh.
+const resetOpen = ref(false)
+async function runReset({ scope, parts, settings }) {
+  const accounts = scope === 'all' ? accountsStore.accounts : [accountsStore.activeAccount].filter(Boolean)
+  const what = RESET_PARTS.filter(p => parts.includes(p.id)).map(p => p.label.toLowerCase())
+  const where = scope === 'all' ? `all ${accounts.length} portfolios` : `"${accounts[0]?.name}"`
+  const lines = []
+  if (what.length) lines.push(`Delete ${what.join(', ')} from ${where}.`)
+  if (settings) lines.push('Reset your settings for every portfolio.')
+  if (!await $confirm({ title: 'Reset data', message: lines.join(' ') + ' This cannot be undone.', confirmLabel: 'Reset', danger: true })) return
+  resetOpen.value = false
+  const opts = { accounts, parts, settings }
   try {
-    await busy.run('Resetting everything…', async step => {
-      step('Deleting trades')
-      await tradesStore.clearAll()
-      step('Deleting balance & cash history')
-      await balanceStore.clearBalance()
-      await balanceStore.clearFundTransactions()
-      await cashEventsStore.clearAll()
-      step('Deleting journal')
-      await journalAdapter.clearAll(accountsStore.activeAccountId)
-      step('Deleting backed-up CSVs & settings')
-      await rawCsvArchiveStore.clearAll()
-      await clearCloudSettings()
-    }, { total: 4 })
+    await busy.run('Resetting…', step => resetCloud(opts, step), { total: resetStepCount(opts) })
   } catch (e) {
-    toast.error('Reset stopped — nothing local was cleared: ' + e.message)
+    toast.error('Reset stopped — nothing on this browser was cleared: ' + e.message)
     return
   }
-  await imageStorageStore.clearFolder()
-  for (const key of Object.keys(localStorage)) {
-    if (!key.startsWith('sb-')) localStorage.removeItem(key)
-  }
-  sessionStorage.clear()
+  if (settings) await imageStorageStore.clearFolder()
+  resetLocal(opts)
   window.location.reload()
 }
 
