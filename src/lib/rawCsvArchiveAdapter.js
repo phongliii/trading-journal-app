@@ -13,6 +13,7 @@
 // (position/cash/balance), not one row per CSV row.
 
 import { getSupabase, getUserId } from './supabaseClient'
+import { packRows, unpackRows } from './csvRowsCodec'
 
 const EMPTY_BUCKET = () => ({ headers: [], rows: [] })
 
@@ -32,7 +33,7 @@ export const rawCsvArchiveAdapter = {
 
     const result = { position: EMPTY_BUCKET(), cash: EMPTY_BUCKET(), balance: EMPTY_BUCKET() }
     for (const row of data || []) {
-      result[row.kind] = { headers: row.headers || [], rows: row.rows || [] }
+      result[row.kind] = { headers: row.headers || [], rows: await unpackRows(row.rows) }
     }
     return result
   },
@@ -40,12 +41,15 @@ export const rawCsvArchiveAdapter = {
   // Upserts the WHOLE bucket for one kind — matches the store's own
   // "rewrite the array, don't diff it" approach (see its header comment),
   // so this just mirrors whatever mergeRows() already computed locally.
+  // The rows are packed (lib/csvRowsCodec.js) so a big archive still fits in
+  // one request.
   async saveBucket(accountId, kind, headers, rows) {
     const sb = getSupabase()
     const userId = await getUserId(sb)
+    const packed = await packRows(rows)
     const { error } = await sb
       .from('raw_csv_archive')
-      .upsert({ user_id: userId, account_id: accountId, kind, headers, rows, updated_at: new Date().toISOString() }, { onConflict: 'user_id,account_id,kind' })
+      .upsert({ user_id: userId, account_id: accountId, kind, headers, rows: packed, updated_at: new Date().toISOString() }, { onConflict: 'user_id,account_id,kind' })
     if (error) throw error
   },
 
