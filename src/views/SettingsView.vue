@@ -30,8 +30,7 @@
           <div>
             <span class="text-sm text-ink">Futures trading day</span>
             <p class="text-xs text-ink-faint mt-0.5">
-              Trades closed from {{ DEFAULT_TRADING_DAY_START }} count toward the next day, like your broker's Trade Date
-              — futures sessions open the evening before. Off: calendar days.
+              Evening trades count toward the next day, matching your broker's Trade Date. Off: calendar days.
             </p>
           </div>
           <button @click="tradingRulesStore.setDayStart(futuresDay ? '00:00' : DEFAULT_TRADING_DAY_START)"
