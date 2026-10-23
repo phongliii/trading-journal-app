@@ -401,6 +401,20 @@ export const useJournalStore = defineStore('journal', () => {
   }
   function isRead(key)   { return readList.value.includes(key) }
 
+  // Journal's "Mark all read": every given key not read yet, in one batch.
+  async function markAllRead(keys) {
+    const unread = keys.filter(k => !readList.value.includes(k))
+    if (!unread.length) return
+    readList.value = [...readList.value, ...unread]
+    saveRead()
+    try {
+      await journalAdapter.markReadMany(accountsStore.activeAccountId, unread)
+    } catch (e) {
+      reportCloudError(toast, e, 'Could not mark journal entries read in the cloud:',
+        'Could not save "mark all read" to the cloud — try again.')
+    }
+  }
+
   function getSections(key) { return data.value[key]?.sections || null }
   async function setSections(key, sections) {
     data.value = { ...data.value, [key]: { ...(data.value[key] || {}), sections } }
@@ -738,7 +752,7 @@ export const useJournalStore = defineStore('journal', () => {
     data, readList, checklistQuestions, loading, loaded, whenLoaded,
     dailyEntries, weeklyEntries, monthlyEntries,
     unreadDaily, unreadWeekly, hasUnread, hasNote,
-    load, markRead, isRead, getSections, setSections, deleteEntry, clearReadState, clearWeeklyData, clearAllData,
+    load, markRead, markAllRead, isRead, getSections, setSections, deleteEntry, clearReadState, clearWeeklyData, clearAllData,
     defaultSections, weeklyDefaultSections, monthlyDefaultSections,
     setChecklistQuestions, removeChecklistQuestion, getChecklistAnswers, setChecklistAnswers,
     getNoTradeDay, setCheckin,
