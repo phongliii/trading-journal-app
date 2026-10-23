@@ -14,7 +14,7 @@ vi.mock('chart.js', () => ({
 
 const { useChart } = await import('../useChart.js')
 const { useBusy } = await import('@/composables/useBusy.js')
-const { holdDraws } = await import('../drawHold.js')
+const { holdDraws, holdRedraws } = await import('../drawHold.js')
 
 let frames = []
 globalThis.requestAnimationFrame = fn => frames.push(fn)
@@ -92,5 +92,18 @@ describe('useChart', () => {
     endRefresh(); await refresh; await flush()
     expect(draws.created).toBe(1)
     expect(draws.updated).toBe(0)
+  })
+
+  it('a background refresh lets a just-opened chart draw now, and redraws it once after', async () => {
+    let endRefresh
+    const data = ref([1])
+    const refresh = holdRedraws(() => new Promise(r => { endRefresh = r }))
+    useChart(ref({}), () => [data.value], () => ({ type: 'line', data: {}, options: {} }))
+    expect(draws.created).toBe(1) // drawn straight away with the loaded data
+    data.value = [1, 2]; await flush()
+    data.value = [1, 2, 3]; await flush()
+    expect(draws.updated).toBe(0) // the refresh's changes wait…
+    endRefresh(); await refresh; await flush()
+    expect(draws.updated).toBe(1) // …and land as one redraw
   })
 })

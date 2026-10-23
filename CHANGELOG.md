@@ -47,6 +47,12 @@
   "Chart image"; with text too it adds "(+ chart image)").
 
 ### Fixed
+- **Charts appeared a beat after the page did.** Opening the Dashboard
+  made its charts wait for the quiet background refresh, even though their
+  data was already loaded; and after a portfolio switch they also waited for
+  the journal and the CSV backup, which they don't use. Charts now draw as
+  soon as their own data is there; a background refresh that does change
+  something still redraws them once.
 - **Unread dots flashed when switching portfolio** — the new portfolio's
   days were briefly checked against the previous portfolio's read list. The
   read list now switches straight away (from this device's copy) and dots

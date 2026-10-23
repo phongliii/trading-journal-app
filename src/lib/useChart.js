@@ -19,7 +19,7 @@
 // to draw, and reads only what the inputs getter returns (plus constants).
 import { watch, onMounted, onBeforeUnmount } from 'vue'
 import { Chart } from 'chart.js'
-import { drawsHeld } from '@/lib/drawHold'
+import { drawsHeld, redrawsHeld } from '@/lib/drawHold'
 
 export function useChart(canvas, inputs, makeConfig) {
   let chart = null
@@ -31,8 +31,8 @@ export function useChart(canvas, inputs, makeConfig) {
   function draw() {
     frame = 0
     // Held (fetches or saves still running): wait and draw once, with the
-    // end result — a chart opened mid-refresh included.
-    if (!canvas.value || drawsHeld()) return
+    // end result. A background refresh only holds charts already drawn.
+    if (!canvas.value || drawsHeld() || (drawnKey !== null && redrawsHeld())) return
     const key = keyOf()
     if (key === drawnKey) return
     drawnKey = key
@@ -57,7 +57,7 @@ export function useChart(canvas, inputs, makeConfig) {
   // Watching the key (a string) means the watcher only fires when the
   // values change, not whenever an equal array is swapped in.
   watch(keyOf, schedule)
-  watch(drawsHeld, held => { if (!held) schedule() })
+  watch(() => drawsHeld() || redrawsHeld(), held => { if (!held) schedule() })
   onBeforeUnmount(() => {
     if (frame) cancelAnimationFrame(frame)
     chart?.destroy()
