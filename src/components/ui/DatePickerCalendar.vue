@@ -1,5 +1,5 @@
 <template>
-  <div class="relative inline-block">
+  <div class="relative inline-flex">
     <button v-if="noteMode" ref="triggerBtn" @click="open = !open"
       class="text-2xs text-brand hover:underline whitespace-nowrap">+ New</button>
     <button v-else ref="triggerBtn" @click="open = !open"

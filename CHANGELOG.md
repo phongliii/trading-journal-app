@@ -39,6 +39,7 @@
   "Chart image"; with text too it adds "(+ chart image)").
 
 ### Fixed
+- Journal: **+ New** sat a few pixels lower than **Mark all read** next to it.
 - **"Could not back up your CSV rows to the cloud" on big imports.** The
   imported trades were always saved fine, but the backup of your original
   CSV rows (which later imports read fees from, and Export downloads) was
