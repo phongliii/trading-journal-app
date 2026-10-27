@@ -25,6 +25,11 @@
           <span v-if="item.to === '/journal' && journalStore.hasUnread" class="ml-auto w-2 h-2 rounded-full bg-yellow-400/80"></span>
         </button>
       </RouterLink>
+
+      <!-- Your trading plan (shared by every portfolio), kept in view on every page -->
+      <div class="pt-4">
+        <StickyNote />
+      </div>
     </nav>
 
     <!-- Footer -->
@@ -67,6 +72,7 @@ import { computed } from 'vue'
 import { useTradesStore } from '@/stores/trades'
 import { useJournalStore } from '@/stores/journal'
 import PortfolioSwitcher from './PortfolioSwitcher.vue'
+import StickyNote from './StickyNote.vue'
 
 const tradesStore  = useTradesStore()
 const journalStore = useJournalStore()

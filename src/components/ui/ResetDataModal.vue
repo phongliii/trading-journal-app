@@ -36,7 +36,7 @@
         <input type="checkbox" class="accent-[#f87171] mt-0.5" v-model="settings" />
         <span>
           <span class="block text-xs text-ink">Settings</span>
-          <span class="block text-2xs text-ink-faint">Tags, strategies, check-in questions, time zone, trading day start, balance alert and display preferences — reset for every portfolio.</span>
+          <span class="block text-2xs text-ink-faint">Tags, strategies, check-in questions, trading plan notes, time zone, trading day start, balance alert and display preferences — reset for every portfolio.</span>
         </span>
       </label>
     </div>

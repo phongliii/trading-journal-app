@@ -76,6 +76,7 @@ import { useWithdrawReminderStore } from '@/stores/withdrawReminder'
 import { useImageStorageStore } from '@/stores/imageStorage'
 import { useTradeMetaStore } from '@/stores/tradeMeta'
 import { useTradingRulesStore } from '@/stores/tradingRules'
+import { useStickyNoteStore } from '@/stores/stickyNote'
 import { useSettingsStore } from '@/stores/settings'
 import { useJournalStore } from '@/stores/journal'
 import { useRawCsvArchiveStore } from '@/stores/rawCsvArchive'
@@ -122,6 +123,7 @@ const withdrawReminderStore = useWithdrawReminderStore()
 const imageStorageStore = useImageStorageStore()
 const tradeMetaStore    = useTradeMetaStore()
 const tradingRulesStore = useTradingRulesStore()
+const stickyNoteStore = useStickyNoteStore()
 const settingsStore     = useSettingsStore()
 const journalStore      = useJournalStore()
 const rawCsvArchiveStore = useRawCsvArchiveStore()
@@ -284,6 +286,7 @@ async function loadCloudDataSequence() {
     strategies: { applyFromCloud: tradeMetaStore.applyStrategiesFromCloud, toCloudValue: tradeMetaStore.strategiesToCloudValue },
     cutoffTime: tradingRulesStore,
     tradingDayStart: tradingRulesStore.dayStartSync,
+    stickyNote: stickyNoteStore,
     timezone: tzStore,
     withdrawReminder: withdrawReminderStore,
     compactMode: settingsStore,

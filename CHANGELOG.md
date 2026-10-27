@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Added
+- **Trading plan sticky note** in the sidebar, under the menu — one note
+  shared by every portfolio, kept in view on every page. Hover and click ✏️
+  to edit (Ctrl/⌘+Enter saves, Esc cancels). Synced with your settings, so it
+  follows you to other devices.
 - **Mark all read** in the Journal: one click marks every unread entry on
   the open tab (Daily or Weekly, every period — not just the month shown)
   as read, saved to the cloud in one batch.
