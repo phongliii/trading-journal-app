@@ -90,12 +90,12 @@
         </template>
         <div class="h-44">
           <EquityCurve
-            :curve="equityMode === 'balance' ? balanceCurve : rangePnlCurve"
+            :curve="showBalance ? balanceCurve : rangePnlCurve"
             :range="equityRange"
             :pnl-curve="rangePnlCurve"
             :capital-curve="capitalCurve"
             :base-capital="balanceStore.hasBalance ? balanceStore.correctStarting : null"
-            :fund-transactions="equityMode === 'balance' ? balanceStore.fundTransactions : []" />
+            :fund-transactions="showBalance ? balanceStore.fundTransactions : []" />
         </div>
       </DashboardCard>
     </section>
@@ -219,11 +219,24 @@ const cashEventsStore = useCashEventsStore()
 const tzStore         = useTimezoneStore()
 // Account fees count in Net P&L (lib/accountCharges.js), not in trade stats.
 const stats           = computed(() => computeStats(tradesStore.trades, balanceStore.accountCharges))
-const pnlMode         = ref('gross')
-const equityMode      = ref('equity')
+// Saved choices are read here, before anything draws, rather than left to
+// the tab controls to restore once they've mounted — by then the charts had
+// already drawn once with the defaults and had to redraw with the saved
+// choice. The controls then find the same value and leave it alone.
+function savedChoice(key, allowed, fallback) {
+  try {
+    const v = localStorage.getItem(key)
+    return allowed.includes(v) ? v : fallback
+  } catch { return fallback }
+}
+const pnlMode         = ref(savedChoice('edgelog:pnlMode', ['gross', 'net'], 'gross'))
+const equityMode      = ref(savedChoice('edgelog:equityMode', ['equity', 'balance'], 'equity'))
+// Balance mode only when there's a balance to show (EquityModeTabs falls back
+// to equity otherwise) — so that fallback never changes what's drawn.
+const showBalance     = computed(() => equityMode.value === 'balance' && balanceStore.hasBalance)
 
 // Realized P&L card: its own range tabs, computed from ALL trades.
-const realizedRange = ref('1M')
+const realizedRange = ref(savedChoice('edgelog:realizedRange', REALIZED_RANGES, '1M'))
 const realizedBars = computed(() => {
   const byDay = {}
   for (const t of tradesStore.trades) {
@@ -237,7 +250,7 @@ const realizedBars = computed(() => {
 const realized = computed(() => buildRealizedBuckets(realizedBars.value, realizedRange.value, tzStore.localDateObj()))
 
 // Equity / Balance card: same range tabs as Realized P&L.
-const equityRange = ref('1M')
+const equityRange = ref(savedChoice('edgelog:equityRange', REALIZED_RANGES, '1M'))
 // First day of the selected range, as 'yyyy-MM-dd' (null for ALL).
 const equityRangeFrom = computed(() => {
   if (equityRange.value === 'ALL') return null

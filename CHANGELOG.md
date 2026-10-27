@@ -55,6 +55,11 @@
   "Chart image"; with text too it adds "(+ chart image)").
 
 ### Fixed
+- **Dashboard charts still drew twice when you'd picked a range or Balance
+  mode.** The 1W/1M/3M/YTD/ALL tabs and the Equity/Balance switch only
+  restored your saved choice after the charts had already drawn with the
+  defaults. The Dashboard now starts from your saved choices, so the first
+  draw is the right one.
 - **Charts appeared a beat after the page did.** Opening the Dashboard
   made its charts wait for the quiet background refresh, even though their
   data was already loaded; and after a portfolio switch they also waited for
