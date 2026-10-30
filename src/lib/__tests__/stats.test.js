@@ -304,6 +304,15 @@ describe('computeBalanceCurve / computeFundBaseCurve', () => {
     expect(computeFundBaseCurve(funds, 1000)).toEqual([{ date: '2026-01-06', value: 500 }])
     expect(computeFundBaseCurve(null, 1000)).toEqual([])
   })
+
+  it('leaves account fees out of the money put in — they are already in P&L', () => {
+    const funds = [
+      { date: '2026-01-05', amount: 500, type: 'deposit' },
+      { date: '2026-01-06', amount: -35, type: 'fee', label: 'Dormant Fee' },
+      { date: '2026-01-07', amount: -200, type: 'withdrawal' },
+    ]
+    expect(computeFundBaseCurve(funds, 1000).map(p => p.value)).toEqual([1500, 1300])
+  })
 })
 
 describe('behaviour analytics', () => {
