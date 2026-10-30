@@ -59,6 +59,10 @@
   "Chart image"; with text too it adds "(+ chart image)").
 
 ### Fixed
+- **Equity chart % could go past −100% (e.g. −101% on ALL).** Account fees
+  were counted twice: once in your trading P&L and again as money taken out
+  of the account. They now only count as P&L, so the % is P&L ÷ (starting
+  balance + deposits − withdrawals).
 - **Dashboard charts still drew twice when you'd picked a range or Balance
   mode.** The 1W/1M/3M/YTD/ALL tabs and the Equity/Balance switch only
   restored your saved choice after the charts had already drawn with the

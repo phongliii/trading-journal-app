@@ -1,6 +1,6 @@
 import { format, parseISO, getDay, getMonth, startOfWeek, endOfWeek, eachDayOfInterval, startOfMonth, endOfMonth, isSameMonth, isToday, startOfYear, endOfYear, subYears, subMonths, startOfQuarter, endOfQuarter, subQuarters } from 'date-fns'
 import { tradeDay, tradeDayDate } from '@/lib/tradeDay'
-import { chargesTotal } from '@/lib/accountCharges'
+import { chargesTotal, isAccountCharge } from '@/lib/accountCharges'
 
 // `charges`: account fees/credits (lib/accountCharges.js) in the same period —
 // counted in totalPnl, the equity curve and daily bars, never in the
@@ -435,7 +435,7 @@ export function computeBalanceCurve(trades, fundTransactions, startingBalance) {
 
 /**
  * Running capital BASE curve — starting balance adjusted only by
- * deposits/withdrawals over time, with trading P&L left out entirely. Used
+ * deposits/withdrawals over time (not account fees, which are P&L), with trading P&L left out entirely. Used
  * to measure trading performance (%) against the capital actually at risk
  * at each point, without a withdrawal/deposit itself reading as a loss/gain.
  *
@@ -444,8 +444,11 @@ export function computeBalanceCurve(trades, fundTransactions, startingBalance) {
  * @returns {Array<{date: string, value: number}>}
  */
 export function computeFundBaseCurve(fundTransactions, startingBalance) {
+  // Deposits and withdrawals only. Account fees/credits (Dormant Fee, …) are
+  // trading P&L (lib/accountCharges.js) — counting them here as well took
+  // them off both sides of P&L ÷ money put in, which could show e.g. −101%.
   const events = (fundTransactions || [])
-    .filter(f => f.date)
+    .filter(f => f.date && !isAccountCharge(f))
     .slice()
     .sort((a, b) => a.date.localeCompare(b.date))
 
