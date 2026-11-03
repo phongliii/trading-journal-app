@@ -200,6 +200,24 @@ export const useJournalStore = defineStore('journal', () => {
     return lastLoad
   }
   let loadedFor = null // portfolio whose entries are loaded (see reportLoadError)
+
+  // An entry written here after a load started (an attached chart image, a
+  // check-in, typed notes) is newer than that load's copy — the load must not
+  // put the older version back. That happened when a background refresh (e.g.
+  // the tab regaining focus as the file picker closed) came back mid-save: the
+  // just-attached image vanished until the next refresh.
+  let writeSeq = 0
+  const lastWrite = new Map() // entry key -> writeSeq of its latest local write
+  function noteLocalWrite(key) { lastWrite.set(key, ++writeSeq) }
+  function keepNewerLocal(cloudData, loadSeq) {
+    const merged = { ...cloudData }
+    for (const [key, seq] of lastWrite) {
+      if (seq <= loadSeq) continue
+      if (key in data.value) merged[key] = data.value[key]
+      else delete merged[key]
+    }
+    return merged
+  }
   async function doLoad() {
     loading.value = true
     const accountId = accountsStore.activeAccountId
@@ -217,8 +235,9 @@ export const useJournalStore = defineStore('journal', () => {
         readList.value = localRead
         readFor.value = localStorage.getItem(readKeyFor(accountId)) !== null ? accountId : null
       }
+      const loadSeq = writeSeq
       const { data: cloudData, readList: cloudRead } = await loadWithRetry(() => journalAdapter.load(accountId))
-      data.value = cloudData
+      data.value = keepNewerLocal(cloudData, loadSeq)
       dataFor.value = accountId
 
       // Re-read localStorage now, right before merging, instead of only
@@ -364,6 +383,7 @@ export const useJournalStore = defineStore('journal', () => {
   // the toast is how the person finds that out instead of just losing it
   // silently on next reload.
   async function saveEntryToCloud(key, content) {
+    noteLocalWrite(key)
     try {
       await journalAdapter.saveEntry(accountsStore.activeAccountId, key, content)
     } catch (e) {
@@ -490,6 +510,7 @@ export const useJournalStore = defineStore('journal', () => {
   }
 
   async function deleteEntry(key) {
+    noteLocalWrite(key)
     data.value = { ...data.value }
     delete data.value[key]
     const idx = readList.value.indexOf(key)

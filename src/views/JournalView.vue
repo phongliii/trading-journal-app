@@ -144,8 +144,15 @@
 
         <!-- Attached chart image — outside the trades-only blocks so a
              no-trade day can still have one -->
-        <div v-if="entryImage" class="bg-surface-2 border border-border rounded-xl overflow-hidden mb-4 relative group cursor-pointer" @click="lightboxOpen = true">
+        <div v-if="entryImage" class="bg-surface-2 border border-border rounded-xl overflow-hidden mb-4 relative group cursor-pointer" @click="entryImageUrl && (lightboxOpen = true)">
           <img v-if="entryImageUrl" :src="entryImageUrl" alt="Chart" class="w-full h-64 object-cover" />
+          <!-- Folder still reconnecting as the app starts -->
+          <div v-else-if="imageFolderLoading" class="w-full h-64 bg-surface-3/40 animate-pulse"></div>
+          <!-- The image is there; the browser just needs permission again -->
+          <div v-else-if="imageNeedsAccess" class="w-full h-64 flex flex-col items-center justify-center gap-2 bg-surface-3/40">
+            <span class="text-2xs text-ink-muted">Allow access to your chart image folder to show this image.</span>
+            <button @click.stop="allowImageAccess" class="text-2xs text-brand bg-brand/10 rounded-full px-3 py-1 hover:bg-brand/20 transition-colors">Allow access</button>
+          </div>
           <div v-else class="w-full h-64 flex flex-col items-center justify-center gap-2 bg-down/5">
             <svg class="w-6 h-6 text-down" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
               <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -477,6 +484,7 @@ const selected       = ref(null)
 const { showCheckinModal, checkinAnswers, noTradeDay, saveCheckin, skipCheckin } = useCheckin(selected)
 const {
   chartFileInput, lightboxOpen, entryImageUrl, hasImageFolder, entryImage,
+  imageNeedsAccess, imageFolderLoading, allowImageAccess,
   onChartFileSelected, removeChartImage, clearBrokenImage,
 } = useChartImage(selected)
 

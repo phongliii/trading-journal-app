@@ -26,13 +26,31 @@ export function useChartImage(selected) {
     return journalStore.getEntryImage(selected.value.key)
   })
 
+  // The browser hasn't (re)granted access to the image folder yet — common
+  // after a restart. The file is fine; it just can't be read until allowed.
+  const imageNeedsAccess = computed(() =>
+    !!entryImage.value && !!imageStorageStore.dirHandle && imageStorageStore.needsPermission)
+  // Still reconnecting the folder as the app starts — not "missing" yet.
+  const imageFolderLoading = computed(() => !!entryImage.value && imageStorageStore.restoring)
+
+  // Re-run whenever the image OR the folder changes: an entry opened before
+  // the folder finished reconnecting at startup used to stay on "File not
+  // found" for good. `latest` drops an older lookup that finishes last.
+  let latest = 0
   async function loadEntryImageUrl() {
+    const run = ++latest
     entryImageUrl.value = null
     if (!entryImage.value) return
-    entryImageUrl.value = await imageStorageStore.getImageUrl(entryImage.value)
+    const url = await imageStorageStore.getImageUrl(entryImage.value)
+    if (run === latest) entryImageUrl.value = url
   }
 
-  watch(entryImage, loadEntryImageUrl, { immediate: true })
+  watch(() => [entryImage.value, imageStorageStore.dirHandle, imageStorageStore.needsPermission, imageStorageStore.restoring],
+    loadEntryImageUrl, { immediate: true })
+
+  async function allowImageAccess() {
+    if (!await imageStorageStore.reconnect()) toast.warn('Access to the chart image folder was not allowed.')
+  }
 
   async function onChartFileSelected(e) {
     const file = e.target.files?.[0]
@@ -70,6 +88,7 @@ export function useChartImage(selected) {
 
   return {
     chartFileInput, lightboxOpen, entryImageUrl, hasImageFolder, entryImage,
+    imageNeedsAccess, imageFolderLoading, allowImageAccess,
     onChartFileSelected, removeChartImage, clearBrokenImage,
   }
 }
