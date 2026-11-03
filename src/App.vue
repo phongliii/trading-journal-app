@@ -284,7 +284,6 @@ async function loadCloudDataSequence() {
     holidays: holidayStore,
     tags: { applyFromCloud: tradeMetaStore.applyTagsFromCloud, toCloudValue: tradeMetaStore.tagsToCloudValue },
     strategies: { applyFromCloud: tradeMetaStore.applyStrategiesFromCloud, toCloudValue: tradeMetaStore.strategiesToCloudValue },
-    cutoffTime: tradingRulesStore,
     tradingDayStart: tradingRulesStore.dayStartSync,
     stickyNote: stickyNoteStore,
     timezone: tzStore,
@@ -319,7 +318,7 @@ watch(() => authStore.user?.id, (id) => {
 // switcher UI) needs its own reload path — NOT loadCloudData(), which
 // would also re-run the settings sync and re-create an accounts default
 // needlessly. Only the per-portfolio cloud data actually changes when the
-// active account changes; holidays/tags/strategies/cutoff/timezone/etc.
+// active account changes; holidays/tags/strategies/timezone/etc.
 // are shared across every portfolio (see lib/cloudSettings.js) and don't
 // need re-syncing here. Skipped on the very first load (prevId
 // undefined/null) since loadCloudDataSequence() above already covers

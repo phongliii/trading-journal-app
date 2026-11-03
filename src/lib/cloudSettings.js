@@ -1,5 +1,5 @@
 // Cloud sync for the small "settings blob" stores — holidays, tradeMeta
-// (tags/strategies), tradingRules (cutoffTime), timezone, withdrawReminder,
+// (tags/strategies), tradingRules (tradingDayStart), timezone, withdrawReminder,
 // and settings (compactMode). Each of those stays exactly what it was (a
 // Pinia store reading/writing localStorage synchronously, so every view
 // that reads them keeps working instantly and offline) — this module adds
