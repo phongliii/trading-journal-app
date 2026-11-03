@@ -14,7 +14,6 @@ import { useJournalStore, DEFAULT_CHECKLIST } from '@/stores/journal'
 import { useHolidayStore } from '@/stores/holidays'
 import { useTimezoneStore } from '@/stores/timezone'
 import { useTradeMetaStore } from '@/stores/tradeMeta'
-import { useTradingRulesStore } from '@/stores/tradingRules'
 import { useWithdrawReminderStore } from '@/stores/withdrawReminder'
 import { useTradesStore } from '@/stores/trades'
 
@@ -35,8 +34,8 @@ export const EXPORT_TYPES = [
   { value: 'notes',       label: 'Notes',                    kind: 'journal-notes' },
   { value: 'holidays',    label: 'Holidays',                 kind: 'journal-holidays' },
   // Everything else that was previously only ever set by hand and had no
-  // export path at all: tags/strategies, the trading-rules cutoff, the
-  // daily check-in questions, timezone, and the balance-alert threshold.
+  // export path at all: tags/strategies, the daily check-in questions,
+  // timezone, and the balance-alert threshold.
   { value: 'settings',    label: 'Settings',                 kind: 'settings-bundle' },
   { value: 'all',         label: 'All Data',                 kind: 'all' },
 ]
@@ -183,10 +182,9 @@ function buildHolidaysExport(range) {
 // ignored. Returns null when every value is still at its factory default —
 // same "nothing to export" convention as the other builders — so a
 // never-touched install doesn't produce a file of pure defaults.
-function isDefaultSettings({ tags, strategies, cutoffTime, checklistQuestions, timezone, withdrawReminder }) {
+function isDefaultSettings({ tags, strategies, checklistQuestions, timezone, withdrawReminder }) {
   return tags.length === 0
     && strategies.length === 0
-    && cutoffTime === '09:30'
     && JSON.stringify(checklistQuestions) === JSON.stringify(DEFAULT_CHECKLIST)
     && timezone.autoDetect === true && !timezone.manualTz
     && withdrawReminder.enabled === false && withdrawReminder.amount == null
@@ -195,14 +193,12 @@ function isDefaultSettings({ tags, strategies, cutoffTime, checklistQuestions, t
 function buildSettingsExport() {
   const journalStore = useJournalStore()
   const tradeMetaStore = useTradeMetaStore()
-  const tradingRulesStore = useTradingRulesStore()
   const timezoneStore = useTimezoneStore()
   const withdrawReminderStore = useWithdrawReminderStore()
 
   const out = {
     tags: tradeMetaStore.tags,
     strategies: tradeMetaStore.strategies,
-    cutoffTime: tradingRulesStore.cutoffTime,
     checklistQuestions: journalStore.checklistQuestions,
     timezone: { autoDetect: timezoneStore.autoDetect, manualTz: timezoneStore.manualTz },
     withdrawReminder: { enabled: withdrawReminderStore.enabled, amount: withdrawReminderStore.amount },
@@ -267,7 +263,6 @@ export async function importJournalFiles(files) {
   const journalStore = useJournalStore()
   const holidayStore = useHolidayStore()
   const tradeMetaStore = useTradeMetaStore()
-  const tradingRulesStore = useTradingRulesStore()
   const timezoneStore = useTimezoneStore()
   const withdrawReminderStore = useWithdrawReminderStore()
   const tradesStore = useTradesStore()
@@ -356,10 +351,6 @@ export async function importJournalFiles(files) {
       }
       if (Array.isArray(parsed.strategies)) {
         for (const s of parsed.strategies) { tradeMetaStore.addStrategyItem(s.text); settingsApplied++ }
-      }
-      if (parsed.cutoffTime) {
-        if (tradingRulesStore.cutoffTime === '09:30') { tradingRulesStore.cutoffTime = parsed.cutoffTime; settingsApplied++ }
-        else settingsSkipped++
       }
       if (Array.isArray(parsed.checklistQuestions)) {
         if (JSON.stringify(journalStore.checklistQuestions) === JSON.stringify(DEFAULT_CHECKLIST)) {

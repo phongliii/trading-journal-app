@@ -15,6 +15,7 @@
   it's merged.
 
 ### Changed
+- Removed the unused "cut-off time" setting (it had no control and did nothing) and two charts that weren't shown anywhere.
 - Settings: the **Supabase Table Schema** is hidden by default behind a Show / Hide button (remembered on this browser) — it's only needed once, at setup.
 - **Always the latest data when you change page.** Opening a page (or
   coming back to the tab) now always checks the cloud for changes from any
@@ -59,6 +60,15 @@
   "Chart image"; with text too it adds "(+ chart image)").
 
 ### Fixed
+- **A just-attached journal chart image sometimes didn't show.** Closing the
+  file picker hands focus back to the tab, which checks the cloud for
+  changes; if that came back mid-save it put the entry back without the
+  image. Edits made while a refresh is loading now win over its older copy
+  (a deleted entry no longer comes back either). Also: an entry opened while
+  the image folder was still reconnecting at startup now shows its image
+  once the folder is ready, instead of "File not found"; and when the browser
+  needs permission to the folder again (e.g. after a restart) the entry offers
+  **Allow access** instead of "File not found" + Clear.
 - **Equity chart % could go past −100% (e.g. −101% on ALL).** Account fees
   were counted twice: once in your trading P&L and again as money taken out
   of the account. They now only count as P&L, so the % is P&L ÷ (starting
