@@ -15,6 +15,12 @@
   it's merged.
 
 ### Changed
+- **Equity / Balance chart %** is now your trading return for the selected
+  range: P&L in the range ÷ your balance at the start of the range (plus
+  deposits − withdrawals made inside it). Before, it divided by every dollar
+  ever put in, so a small account barely moved the % — e.g. $139 traded up to
+  $1,546 showed +2.6% instead of +1,009%. Deposits and withdrawals still never
+  count as profit or loss.
 - Removed the unused "cut-off time" setting (it had no control and did nothing) and two charts that weren't shown anywhere.
 - Settings: the **Supabase Table Schema** is hidden by default behind a Show / Hide button (remembered on this browser) — it's only needed once, at setup.
 - **Always the latest data when you change page.** Opening a page (or

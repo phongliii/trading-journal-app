@@ -3,7 +3,7 @@ import {
   computeStats, aggregateTrades, groupByMonth, groupByDow, groupBySymbol,
   resolvePeriodRange, filterTradesByMonth, filterTradesByDateRange,
   fmt, fmtCompact, fmtPct,
-  computeDrawdownFromEvents, computeBalanceCurve, computeFundBaseCurve,
+  computeDrawdownFromEvents, computeBalanceCurve, computeFundBaseCurve, computeRangeCapital,
   computeRevengeTrading, computeOvertrading, computeHourlyPerf, computeSideBias, drawdownSummary,
 } from '../stats.js'
 
@@ -384,5 +384,37 @@ describe('drawdownSummary', () => {
 
   it('handles no data', () => {
     expect(drawdownSummary({ events: [], trades: [] })).toEqual({ maxDrawdown: 0, source: 'trades' })
+  })
+})
+
+describe('computeRangeCapital', () => {
+  const balance = [
+    { date: '2026-10-28', value: 500 },
+    { date: '2026-10-30', value: 139.48 }, // Friday close
+    { date: '2026-11-03', value: 900 },
+    { date: '2026-11-05', value: 1546.9 },
+  ]
+
+  it('measures a range against the balance it started with', () => {
+    const { base, curve } = computeRangeCapital(balance, [], '2026-11-02', 26700)
+    expect(base).toBe(139.48)
+    expect(curve).toEqual([])
+    expect(((1546.9 - 139.48) / base) * 100).toBeCloseTo(1009.05, 1)
+  })
+
+  it('adds deposits/withdrawals inside the range, not fees or earlier ones', () => {
+    const funds = [
+      { date: '2026-10-29', amount: 1000, type: 'deposit' },   // before the range
+      { date: '2026-11-03', amount: 500, type: 'deposit' },
+      { date: '2026-11-04', amount: -35, type: 'fee', label: 'Dormant Fee' },
+      { date: '2026-11-04', amount: -200, type: 'withdrawal' },
+    ]
+    const { base, curve } = computeRangeCapital(balance, funds, '2026-11-02', 26700)
+    expect(base).toBe(139.48)
+    expect(curve.map(p => p.value)).toEqual([639.48, 439.48])
+  })
+
+  it('uses the starting balance for all history', () => {
+    expect(computeRangeCapital(balance, [], null, 4000).base).toBe(4000)
   })
 })

@@ -443,6 +443,32 @@ export function computeBalanceCurve(trades, fundTransactions, startingBalance) {
  * @param {number} startingBalance - account balance before the first deposit/withdrawal
  * @returns {Array<{date: string, value: number}>}
  */
+/**
+ * What the chart's hover % is measured against for a range starting at
+ * `from` ('yyyy-MM-dd', or null for all history): the account balance just
+ * before the range began, then + deposits − withdrawals made inside it. So
+ * the % is the range's trading return on the money that was in the account —
+ * a $139 balance that trades to $1,546 reads +1,009%, not +5% of every dollar
+ * ever deposited — and money moved in or out is never counted as P&L.
+ *
+ * @param {Array} balanceCurve - computeBalanceCurve output (all history)
+ * @param {Array} fundTransactions - [{ date, amount, type }]
+ * @param {string|null} from - first day of the range
+ * @param {number} startingBalance - balance before any history
+ * @returns {{ base: number, curve: Array<{date: string, value: number}> }}
+ */
+export function computeRangeCapital(balanceCurve, fundTransactions, from, startingBalance) {
+  let base = startingBalance || 0
+  if (from) {
+    for (const p of balanceCurve || []) {
+      if (p.date.slice(0, 10) >= from) break
+      base = p.value
+    }
+  }
+  const inRange = (fundTransactions || []).filter(f => f.date && (!from || f.date >= from))
+  return { base, curve: computeFundBaseCurve(inRange, base) }
+}
+
 export function computeFundBaseCurve(fundTransactions, startingBalance) {
   // Deposits and withdrawals only. Account fees/credits (Dormant Fee, …) are
   // trading P&L (lib/accountCharges.js) — counting them here as well took
