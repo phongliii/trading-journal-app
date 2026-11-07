@@ -495,8 +495,10 @@ const imageStorageStore = useImageStorageStore()
 // Cheap fingerprint of only the fields DayChart/dayStats actually read —
 // deliberately excludes notes/tags/strategy/chartImage so editing a
 // trade's notes doesn't look like a "change" here.
+// Sorted, so the same trades coming back from a refresh in another order
+// aren't a "change" either.
 function tradesFingerprint(trades) {
-  return trades.map(t => `${t.id}|${t.pnl}|${t.fees}|${t.gross_pnl}|${t.sold_at}|${t.bought_at}|${t.qty}|${t.symbol}`).join(';')
+  return trades.map(t => `${t.id}|${t.pnl}|${t.fees}|${t.gross_pnl}|${t.sold_at}|${t.bought_at}|${t.qty}|${t.symbol}`).sort().join(';')
 }
 
 // Keep the currently-open entry's trade data in sync when the underlying

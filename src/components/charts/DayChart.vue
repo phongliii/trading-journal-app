@@ -173,6 +173,12 @@ function makeConfig() {
   }
 }
 
-useChart(canvas, () => props.trades, makeConfig)
+// Only what the chart draws, in time order: a refresh that returns the same
+// trades in another order, or with other fields changed (notes, tags), is
+// the same chart and mustn't redraw it.
+useChart(canvas, () => [
+  props.mode,
+  props.trades.map(t => [t.sold_at, t.pnl]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
+], makeConfig)
 onBeforeUnmount(tooltipCleanup)
 </script>
