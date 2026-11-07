@@ -66,6 +66,11 @@
   "Chart image"; with text too it adds "(+ chart image)").
 
 ### Fixed
+- **Journal day chart sometimes redrew for no reason.** A background refresh
+  could return the same trades in a different order, or with a note or tag
+  changed, and the chart redrew even though nothing on it changed. It now
+  only redraws when a trade's time or P&L (or the day/week/month view)
+  actually changes.
 - **A just-attached journal chart image sometimes didn't show.** Closing the
   file picker hands focus back to the tab, which checks the cloud for
   changes; if that came back mid-save it put the entry back without the
